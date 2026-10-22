@@ -1,0 +1,40 @@
+# NetEase Cloud Music bundle for DeepSeek Harness.
+#
+# This bundle inserts its own plugin entry: the host half (NetEase session,
+# playback queue, audio proxy, agent tools) and the browser half (the sidebar
+# page) both come from the single package named below.
+#
+# Everything has a default inside the package, so this profile stays empty.
+# Optional fields under `config`:
+#   apiPrefix          route prefix (default `music`) — keep it `music` unless
+#                      you also rebuild the browser half.
+#   dataDir            where session.json lives (default $DSH_HOME/music).
+#   audioLevel         exhigh (320 kbps, default); also standard, higher,
+#                      lossless, hires, jymaster, dolby, sky, jyeffect.
+#   requestTimeoutMs   NetEase request deadline (default 15000).
+#   dj.provider        model route for the AI DJ's model tier, e.g. opencode-go.
+#   dj.model           exact model id, e.g. deepseek-v4.1-flash.
+#   dj.sessionId       the identity every model call carries. A leaf call cannot
+#                      set headers, so this string is the only identity the DJ
+#                      can give a provider — and each adapter maps it onto that
+#                      provider's own per-conversation header (pi-ai emits
+#                      `x-opencode-session` for the `opencode-go` route). Left
+#                      unset, one is minted on first use and persisted in
+#                      session.json, so every plan and restart stays inside one
+#                      conversation.
+#
+# Route resolution, highest first: the player's picker -> `dj.provider`/`dj.model`
+# -> the session's default model (`agent-default-model`, which is why "use my
+# session model" needs no configuration) -> discovery, whose first row is
+# arbitrary. Only the choice of model is shared with the session: the DJ is not
+# an agent and starts none. It makes stateless leaf calls — one to curate each
+# plan, and one to rewrite a mood brief into search terms the first time that
+# brief is seen — so there is no session to rotate or dispose.
+#
+# With no model route at all the DJ still works: it scores its candidates —
+# similar songs, personal FM, rested likes, the daily recommendations, the
+# charts and any mood brief — by brief match, artist affinity, and the
+# listener's likes, dislikes and skips.
+- insert:
+    - id: music
+      name: 'ncm-plugin'

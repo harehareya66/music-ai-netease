@@ -1,0 +1,13 @@
+# 第三方参考源码：只在本地对照，不进仓库
+.reference/
+
+# 依赖与打包产物
+node_modules/
+*.tgz
+package-lock.json
+
+# 运行时数据：登录态、听歌历史都在 DSH 的 dataDir 里，绝不进仓库
+session.json
+cache/
+*.log
+.DS_Store

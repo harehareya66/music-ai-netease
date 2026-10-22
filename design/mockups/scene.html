@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>场景歌单 · 概念稿</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --line:#262A33; --text:#E8EAED; --muted:#8B909A;
+    --red:#E5484D; --teal:#2FB3A6; --amber:#F5A524;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;padding:26px 32px 26px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+  .back{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+  .back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  h1{font-size:21px;font-weight:600;margin:0;letter-spacing:.4px}
+  .sub{font-size:12.5px;color:var(--muted)}
+  .right{margin-left:auto;height:32px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:#13161C;
+         display:grid;place-items:center;font-size:12.5px;color:#B7BCC6}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--card)}
+  /* 场景卡 */
+  .scene{display:flex;align-items:center;gap:18px;padding:18px 20px;margin-bottom:16px;
+         background:linear-gradient(100deg,rgba(47,179,166,.12),rgba(23,26,32,.2) 44%,rgba(23,26,32,.2))}
+  .scene .say{font-size:13px;color:#8B909A;flex:none}
+  .scene .say b{display:block;font-size:17px;color:#E8EAED;font-weight:600;margin-top:5px;letter-spacing:.3px}
+  .scene .chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:6px}
+  .chip{height:28px;padding:0 11px;border-radius:8px;background:#1B1F26;border:1px solid #2B303A;color:#B7BCC6;
+        font-size:12px;display:grid;place-items:center}
+  .chip i{font-style:normal;color:#6E7480;margin-right:5px}
+  .chip.warn{color:#F2C07A;border-color:rgba(245,165,36,.32);background:rgba(245,165,36,.08)}
+  .scene .go{margin-left:auto;height:34px;padding:0 14px;border-radius:9px;border:1px solid var(--line);
+             background:#12151B;color:#C9CDD6;font-size:12.5px;display:grid;place-items:center;flex:none}
+  /* 主体 */
+  .grid{display:grid;grid-template-columns:minmax(0,1.5fr) 396px;gap:16px}
+  .list{padding:6px 6px 8px}
+  .lh{display:flex;align-items:center;gap:8px;padding:12px 14px 8px}
+  .lh b{font-size:13px}
+  .lh span{font-size:11.5px;color:var(--muted)}
+  .lh .act{margin-left:auto;display:flex;gap:8px}
+  .lh .act .b{height:26px;padding:0 10px;border-radius:7px;border:1px solid var(--line);display:grid;place-items:center;
+              font-size:11.5px;color:#A9AEB8}
+  /* 三个动作的语义写在界面上，别只写在文档里 */
+  .lhint{padding:0 14px 8px;font-size:11px;color:#5F6570;line-height:1.7}
+  .lhint b{font-weight:600;color:#8B909A}
+  .row{display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:9px}
+  .row:hover{background:#1B1E25}
+  .idx{width:16px;text-align:right;font-size:11.5px;color:#6E7480;font-variant-numeric:tabular-nums}
+  .cv{width:38px;height:38px;border-radius:8px;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .c1{background:linear-gradient(135deg,#243B55,#141E30)} .c2{background:linear-gradient(135deg,#5B2A3A,#1B1420)}
+  .c3{background:linear-gradient(135deg,#1E3B35,#0F1D1A)} .c4{background:linear-gradient(135deg,#3A2F1E,#171310)}
+  .c5{background:linear-gradient(135deg,#2C2A4A,#14131F)} .c6{background:linear-gradient(135deg,#3C2632,#161016)}
+  .nm{min-width:0}
+  .nm b{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nm span{font-size:11.5px;color:var(--muted)}
+  .why{display:flex;gap:6px;margin-left:auto;flex:none}
+  .why span{font-size:11px;color:#9AA0AB;background:#1B1F26;border:1px solid #2B303A;border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .why span.own{color:#8FD6CB;border-color:rgba(47,179,166,.3);background:rgba(47,179,166,.08)}
+  .x{width:22px;height:22px;display:grid;place-items:center;color:#4C525D;font-size:14px;flex:none}
+  /* 右栏 */
+  .side{display:flex;flex-direction:column;gap:16px}
+  .panel{padding:16px}
+  .panel h3{margin:0 0 3px;font-size:13px;font-weight:600}
+  .panel .hint{font-size:11.5px;color:var(--muted)}
+  .src{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+  .sr{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#B7BCC6}
+  .sr .dot{width:7px;height:7px;border-radius:2px}
+  .sr b{margin-left:auto;color:#E8EAED;font-variant-numeric:tabular-nums}
+  .save{margin-top:12px}
+  .save label{font-size:11.5px;color:var(--muted)}
+  .inp{height:36px;border-radius:9px;border:1px solid var(--line);background:#12151B;display:flex;align-items:center;
+       padding:0 11px;font-size:12.5px;color:#D6DAE0;margin-top:7px}
+  .inp.faint{color:#6E7480}
+  .btns{display:flex;gap:9px;margin-top:12px}
+  .btn{height:36px;border-radius:9px;display:grid;place-items:center;font-size:12.5px;font-weight:600}
+  .btn.primary{background:var(--red);color:#fff;flex:1;box-shadow:0 8px 18px -10px rgba(229,72,77,.9)}
+  .btn.primary.off{background:#23272F;color:#7C828D;box-shadow:none}
+  .btn.ghost{border:1px solid var(--line);background:#13161C;color:#C9CDD6;flex:none;padding:0 14px}
+  .locked{margin-top:9px;font-size:11.5px;color:#F2C07A;background:rgba(245,165,36,.08);border:1px solid rgba(245,165,36,.26);
+          border-radius:8px;padding:8px 10px;line-height:1.6}
+  .foot{margin-top:14px;font-size:11.5px;color:#5F6570;text-align:center}
+  @media (max-width:1120px){
+    .top{flex-wrap:wrap}
+    .right{margin-left:0}
+    .scene{flex-wrap:wrap;gap:14px}
+    .scene .go{margin-left:0}
+    .grid{grid-template-columns:minmax(0,1fr)}
+    .lh{flex-wrap:wrap}
+    .why{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <h1>场景歌单</h1>
+    <div class="sub">从一句话，到一张能存进账号的歌单</div>
+    <div class="right">聊天里也能直接说</div>
+  </div>
+
+  <div class="card scene">
+    <div class="say">你说：<b>「下雨天的下午，别太吵」</b></div>
+    <div class="chips">
+      <div class="chip"><i>场景</i>雨天下午</div>
+      <div class="chip"><i>节奏</i>慢 → 中速</div>
+      <div class="chip"><i>语言</i>不限</div>
+      <div class="chip"><i>时长</i>约 42 分钟</div>
+      <div class="chip warn"><i>排除</i>你跳过过 2 首</div>
+    </div>
+    <div class="go">换一批</div>
+  </div>
+
+  <div class="grid">
+    <div class="card list">
+      <div class="lh"><b>草稿 9 首</b><span>已按情绪过渡排序，可单首移除</span>
+        <div class="act"><div class="b">重排</div><div class="b">试听全部</div></div>
+      </div>
+      <div class="lhint"><b>试听全部</b> 草稿转临时队列（不落盘、不进历史） · <b>重排</b> 按 BPM/情绪过渡纯代码重排（不换歌） · <b>换一批</b> 同 brief 重新生成草稿</div>
+      <div class="row"><span class="idx">1</span><span class="cv c1"></span><span class="nm"><b>夜航西飞</b><span>陈粒 · 洄游</span></span><span class="why"><span class="own">你红心过 陈粒</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">2</span><span class="cv c2"></span><span class="nm"><b>秦皇岛</b><span>万能青年旅店 · 万能青年旅店</span></span><span class="why"><span>BPM 78 · 华语</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">3</span><span class="cv c3"></span><span class="nm"><b>雨的印记</b><span>Yiruma · First Love</span></span><span class="why"><span>搜索命中「雨」</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">4</span><span class="cv c4"></span><span class="nm"><b>水星记</b><span>郭顶 · 飞行器的执行周期</span></span><span class="why"><span class="own">相似于《秦皇岛》</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">5</span><span class="cv c5"></span><span class="nm"><b>南山南</b><span>马頔 · 孤岛</span></span><span class="why"><span>来自歌单《雨天》</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">6</span><span class="cv c6"></span><span class="nm"><b>海阔天空</b><span>Beyond · 乐与怒</span></span><span class="why"><span>BPM 84 · 中速</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">7</span><span class="cv c1"></span><span class="nm"><b>关于郑州的记忆</b><span>李志 · 你好，郑州</span></span><span class="why"><span>每日推荐</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">8</span><span class="cv c2"></span><span class="nm"><b>陀螺</b><span>万晓利 · 这一切没有想象的那么糟</span></span><span class="why"><span class="own">相似于《水星记》</span></span><span class="x">✕</span></div>
+      <div class="row"><span class="idx">9</span><span class="cv c3"></span><span class="nm"><b>晚安</b><span>丢火车 · 晚安</span></span><span class="why"><span>收尾 · BPM 72</span></span><span class="x">✕</span></div>
+    </div>
+
+    <div class="side">
+      <div class="card panel">
+        <h3>这 9 首从哪来</h3>
+        <div class="hint">不是随机搜关键词，是从四路候选里按场景打分</div>
+        <div class="src">
+          <div class="sr"><span class="dot" style="background:#E5484D"></span>搜索命中「雨天 / 安静」<b>4</b></div>
+          <div class="sr"><span class="dot" style="background:#8B909A"></span>相似歌曲（从红心发散）<b>3</b></div>
+          <div class="sr"><span class="dot" style="background:#5A6070"></span>你的红心与常听艺人<b>1</b></div>
+          <div class="sr"><span class="dot" style="background:#3A3F4A"></span>每日推荐与榜单<b>1</b></div>
+        </div>
+        <div class="hint" style="margin-top:11px">你跳过过 2 首，已从候选里剔除</div>
+      </div>
+
+      <div class="card panel">
+        <h3>存下来</h3>
+        <div class="hint">歌单会出现在你的网易云账号里</div>
+        <div class="save">
+          <label>歌单名</label>
+          <div class="inp">雨天下午 · 慢一点</div>
+          <div class="btns">
+            <div class="btn primary off">存到我的歌单（待验证）</div>
+            <div class="btn ghost">只存本地</div>
+          </div>
+          <div class="locked">写歌单接口还没实测（playlist/create · playlist/tracks/manipulate）。验证通过前，主按钮置灰，只能存本地。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">候选池复用 AI DJ 的打分逻辑 · 场景解析由模型完成，选歌与排序由代码完成</div>
+</body>
+</html>

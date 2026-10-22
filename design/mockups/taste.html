@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>口味画像 · 概念稿</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
+    --text:#E8EAED; --muted:#8B909A; --red:#E5484D; --teal:#2FB3A6;
+    /* 图表类别灰阶：按序取，只有"峰值/第一名"才用 --red */
+    --g1:#8B909A; --g2:#5A6070; --g3:#3A3F4A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;padding:26px 32px 34px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .back{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+  .back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  h1{font-size:21px;font-weight:600;margin:0;letter-spacing:.4px}
+  .sub{font-size:12.5px;color:var(--muted);margin-left:2px}
+  .chips{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .chip{height:32px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:#13161C;
+        display:grid;place-items:center;font-size:12.5px;color:#A9AEB8}
+  .chip.on{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--card)}
+  /* summary */
+  .summary{display:flex;align-items:center;gap:34px;padding:22px 24px;margin-bottom:16px;
+           background:linear-gradient(100deg,rgba(229,72,77,.13),rgba(23,26,32,.2) 46%,rgba(23,26,32,.2))}
+  .summary .big{font-size:19px;font-weight:600;line-height:1.55;letter-spacing:.3px;flex:1}
+  .summary .big i{font-style:normal;color:#FF9EA1}
+  .tags{display:flex;gap:9px;flex:none}
+  .tag{height:28px;padding:0 12px;border-radius:8px;background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.32);
+       color:#F2A2A5;font-size:12.5px;display:grid;place-items:center}
+  /* row 1: three charts */
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+  .chart{padding:18px 20px 16px}
+  .chart h3{margin:0 0 4px;font-size:13.5px;font-weight:600}
+  .chart .hint{font-size:11.5px;color:var(--muted)}
+  /* donut */
+  .donutWrap{display:flex;align-items:center;gap:22px;margin-top:14px}
+  .donut{width:144px;height:144px;border-radius:50%;flex:none;position:relative;
+    background:conic-gradient(var(--red) 0 62%, var(--g1) 62% 83%, var(--g2) 83% 94%, var(--g3) 94% 100%)}
+  .donut:after{content:"";position:absolute;inset:35px;border-radius:50%;background:var(--card)}
+  .donut .mid{position:absolute;inset:0;display:grid;place-items:center;z-index:2}
+  .donut .mid b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+  .donut .mid span{font-size:10.5px;color:var(--muted);display:block;text-align:center;margin-top:1px}
+  .legend{display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:#B7BCC6}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}
+  .legend b{margin-left:6px;color:#E8EAED;font-variant-numeric:tabular-nums}
+  /* bars */
+  .bars{display:flex;align-items:flex-end;gap:14px;height:122px;margin-top:18px;padding:0 4px}
+  .bcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:8px}
+  .bcol .v{font-size:11px;color:#B7BCC6;font-variant-numeric:tabular-nums}
+  .bcol .b{width:100%;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#4A4F5C,#2A2E38)}
+  .bcol:nth-child(2) .b{background:linear-gradient(180deg,#E5484D,#8E2B33)}   /* 峰值（2010s）才用红 */
+  .bcol .x{font-size:11px;color:var(--muted)}
+  /* hbars */
+  .hbars{margin-top:18px;display:flex;flex-direction:column;gap:13px}
+  .hb{display:flex;align-items:center;gap:10px;font-size:12px;color:#B7BCC6}
+  .hb .lab{width:46px;flex:none}
+  .hb .track{flex:1;height:8px;border-radius:6px;background:#22262E;overflow:hidden}
+  .hb .track i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#4A4F5C,#2A2E38)}
+  .hb:first-child .track i{background:linear-gradient(90deg,#E5484D,#8E2B33)}   /* 峰值（慢速）才用红 */
+  .hb .pct{width:34px;text-align:right;color:#E8EAED;font-variant-numeric:tabular-nums}
+  /* row 2 */
+  .grid2{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;margin-bottom:16px}
+  .artists{padding:18px 20px}
+  .arow{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:13px}
+  .arow .rk{width:14px;color:#6E7480;font-variant-numeric:tabular-nums;font-size:12px}
+  .arow .av{width:30px;height:30px;border-radius:50%;flex:none}
+  .a1{background:linear-gradient(135deg,#3A5068,#18222E)} .a2{background:linear-gradient(135deg,#5B2A3A,#22141A)}
+  .a3{background:linear-gradient(135deg,#2E4B42,#14201C)} .a4{background:linear-gradient(135deg,#4A3A22,#1F1810)}
+  .a5{background:linear-gradient(135deg,#33305E,#191727)}
+  .arow .nm{flex:1}
+  .arow .cnt{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+  .cloud{padding:18px 20px}
+  .cloud .cw{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px;align-items:center}
+  .cw span{border-radius:8px;background:#1E222A;border:1px solid #2B303A;color:#B7BCC6;padding:4px 10px}
+  .cw span.hot{color:#FFB3B5;border-color:rgba(229,72,77,.42);background:rgba(229,72,77,.1)}
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .stat{padding:16px 20px;display:flex;align-items:baseline;gap:12px}
+  .stat b{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12.5px;color:var(--muted)}
+  .stat .up{color:var(--muted);font-size:11.5px;margin-left:auto}
+  @media (max-width:1120px){
+    .grid3,.grid2,.stats{grid-template-columns:minmax(0,1fr)}
+    .top{flex-wrap:wrap}
+    .chips{margin-left:0;flex-wrap:wrap}
+    .summary{flex-wrap:wrap;gap:16px}
+    .tags{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <h1>我的口味画像</h1>
+    <div class="sub">数据来源：账号听歌记录 + 本机播放历史</div>
+    <div class="chips">
+      <div class="chip on">近 4 周</div>
+      <div class="chip">近半年</div>
+      <div class="chip">全部</div>
+      <div class="chip">刷新</div>
+    </div>
+  </div>
+
+  <div class="card summary">
+    <div class="big">你是个偏<i>慢速</i>、偏<i>华语</i>、爱在<i>深夜</i>听歌的人；<br>最近四周新歌吃得不少，但单曲循环的瘾还没戒。</div>
+    <div class="tags">
+      <div class="tag">华语</div><div class="tag">民谣</div><div class="tag">2010s</div>
+      <div class="tag">慢速</div><div class="tag">夜听</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card chart">
+      <h3>语言分布</h3><div class="hint">按曲目占比</div>
+      <div class="donutWrap">
+        <div class="donut"></div>
+        <div class="legend">
+          <div><i style="background:#E5484D"></i>华语<b>62%</b></div>
+          <div><i style="background:#8B909A"></i>英语<b>21%</b></div>
+          <div><i style="background:#5A6070"></i>日语<b>11%</b></div>
+          <div><i style="background:#3A3F4A"></i>其他<b>6%</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart">
+      <h3>年代分布</h3><div class="hint">按发行年份</div>
+      <div class="bars">
+        <div class="bcol"><div class="v">18%</div><div class="b" style="height:34%"></div><div class="x">2020s</div></div>
+        <div class="bcol"><div class="v">41%</div><div class="b" style="height:78%"></div><div class="x">2010s</div></div>
+        <div class="bcol"><div class="v">24%</div><div class="b" style="height:46%"></div><div class="x">2000s</div></div>
+        <div class="bcol"><div class="v">11%</div><div class="b" style="height:21%"></div><div class="x">1990s</div></div>
+        <div class="bcol"><div class="v">6%</div><div class="b" style="height:11%"></div><div class="x">更早</div></div>
+      </div>
+    </div>
+
+    <div class="card chart">
+      <h3>节奏分布</h3><div class="hint">按 BPM 分档</div>
+      <div class="hbars">
+        <div class="hb"><span class="lab">慢速</span><span class="track"><i style="width:48%"></i></span><span class="pct">48%</span></div>
+        <div class="hb"><span class="lab">中速</span><span class="track"><i style="width:37%"></i></span><span class="pct">37%</span></div>
+        <div class="hb"><span class="lab">快速</span><span class="track"><i style="width:15%"></i></span><span class="pct">15%</span></div>
+      </div>
+      <div class="hint" style="margin-top:12px">平均 96 BPM · 比上一周期（前 4 周）慢 4</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card artists">
+      <h3 style="margin:0 0 4px;font-size:13.5px;font-weight:600">最常听的艺人</h3>
+      <div class="hint" style="font-size:11.5px;color:var(--muted)">近 4 周 · 按播放次数</div>
+      <div class="arow"><span class="rk">1</span><span class="av a1"></span><span class="nm">陈粒</span><span class="cnt">87 次</span></div>
+      <div class="arow"><span class="rk">2</span><span class="av a2"></span><span class="nm">万能青年旅店</span><span class="cnt">61 次</span></div>
+      <div class="arow"><span class="rk">3</span><span class="av a3"></span><span class="nm">告五人</span><span class="cnt">44 次</span></div>
+      <div class="arow"><span class="rk">4</span><span class="av a4"></span><span class="nm">草东没有派对</span><span class="cnt">38 次</span></div>
+      <div class="arow"><span class="rk">5</span><span class="av a5"></span><span class="nm">郭顶</span><span class="cnt">29 次</span></div>
+    </div>
+
+    <div class="card cloud">
+      <h3 style="margin:0 0 4px;font-size:13.5px;font-weight:600">情绪与场景</h3>
+      <div class="hint" style="font-size:11.5px;color:var(--muted)">从你常听的歌的标签里长出来的</div>
+      <div class="cw">
+        <span class="hot" style="font-size:19px">深夜</span>
+        <span style="font-size:15px">通勤</span>
+        <span class="hot" style="font-size:17px">怀旧</span>
+        <span style="font-size:13px">雨天</span>
+        <span style="font-size:15px">独处</span>
+        <span class="hot" style="font-size:16px">慢热</span>
+        <span style="font-size:12.5px">散步</span>
+        <span style="font-size:14px">加班</span>
+        <span style="font-size:12.5px">周末</span>
+        <span style="font-size:13px">清晨</span>
+        <span style="font-size:12.5px">公路</span>
+        <span style="font-size:13.5px">夏天</span>
+        <span style="font-size:12.5px">独白</span>
+        <span style="font-size:12.5px">海边</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="card stat"><b>18%</b><span>新歌率</span><span class="up">↑ 比上一周期（前 4 周）+5%</span></div>
+    <div class="card stat"><b>27%</b><span>重复播放</span><span class="up">↑ 比上一周期（前 4 周）+8%</span></div>
+    <div class="card stat"><b>96</b><span>平均 BPM</span><span class="up">↓ 比上一周期（前 4 周）-4</span></div>
+  </div>
+</body>
+</html>

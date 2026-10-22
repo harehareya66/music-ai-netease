@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>播放器 · 概念稿</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
+    --text:#E8EAED; --muted:#8B909A; --red:#E5484D; --teal:#2FB3A6; --amber:#F5A524;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex;height:100vh;overflow:hidden}
+  /* ---------- 左栏 ---------- */
+  .rail{width:64px;flex:none;background:#0B0D11;border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0}
+  .rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#E5484D,#8E2B33);
+              margin-bottom:12px;display:grid;place-items:center;font-weight:700;font-size:15px;color:#fff}
+  .rail .item{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
+  .rail .item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .rail .item.active{background:rgba(229,72,77,.14);color:var(--red)}
+  .rail .spacer{flex:1}
+  /* ---------- 主体 ---------- */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:60px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line)}
+  .topbar h1{font-size:15px;font-weight:600;margin:0;letter-spacing:.3px}
+  .topbar .crumb{color:var(--muted);font-size:13px}
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  .avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#2FB3A6,#1D5C58);display:grid;place-items:center;
+          font-size:11px;color:#fff}
+  .content{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 468px;gap:28px;padding:22px 24px 26px;min-height:0}
+  /* ---------- 左：正在播放 ---------- */
+  .stage{display:flex;flex-direction:column;align-items:center;min-width:0}
+  .cover{position:relative;width:272px;height:272px;border-radius:18px;overflow:hidden;
+         background:
+           radial-gradient(circle at 72% 26%, rgba(240,236,220,.92) 0 26px, rgba(240,236,220,0) 27px),
+           radial-gradient(circle at 34% 18%, rgba(120,160,220,.55), transparent 58%),
+           radial-gradient(circle at 78% 84%, rgba(229,72,77,.5), transparent 55%),
+           linear-gradient(165deg,#0A1220 0%,#121A2C 46%,#1B1420 100%);
+         box-shadow:0 30px 70px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05) inset;
+  }
+  .cover:after{content:"";position:absolute;left:-10%;right:-10%;bottom:-6%;height:46%;
+               background:linear-gradient(to top,#05070B 12%,transparent);}
+  .cover .mountain{position:absolute;inset:auto 0 0 0;height:52%;
+               background:
+                 linear-gradient(150deg,transparent 48%,rgba(255,255,255,.06) 48.5%,transparent 50%),
+                 linear-gradient(200deg,transparent 55%,rgba(255,255,255,.05) 55.5%,transparent 58%);}
+  .q{position:absolute;left:14px;bottom:14px;z-index:2;font-size:11px;letter-spacing:.4px;
+     padding:3px 8px;border-radius:6px;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.18);color:#DCE1E8}
+  .meta{margin-top:20px;text-align:center}
+  .meta .title{font-size:27px;font-weight:600;letter-spacing:.5px}
+  .meta .artist{margin-top:8px;font-size:15px;color:#C2C7D0}
+  .meta .artist span{color:#6F7581;margin:0 8px}
+  .meta .album{margin-top:6px;font-size:12.5px;color:var(--muted)}
+  .progress{width:520px;margin-top:18px}
+  .bar{height:4px;border-radius:4px;background:#262A33;position:relative}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:31%;border-radius:4px;background:linear-gradient(90deg,#E5484D,#F07C80)}
+  .bar b{position:absolute;left:31%;top:50%;width:11px;height:11px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);
+         box-shadow:0 0 0 4px rgba(229,72,77,.18)}
+  .times{display:flex;justify-content:space-between;margin-top:9px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .controls{display:flex;align-items:center;gap:26px;margin-top:18px}
+  .ctrl{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#B9BEC8}
+  .ctrl svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .ctrl.on{color:var(--red)}
+  .play{width:54px;height:54px;border-radius:50%;background:var(--red);display:grid;place-items:center;
+        box-shadow:0 10px 26px -10px rgba(229,72,77,.85)}
+  .play svg{width:20px;height:20px;fill:#fff;stroke:none;margin-left:2px}
+  .tabs{display:flex;gap:26px;margin-top:30px;font-size:13.5px;color:var(--muted)}
+  .tabs .t{position:relative;padding-bottom:9px}
+  .tabs .t.active{color:var(--text);font-weight:600}
+  .tabs .t.active:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--red)}
+  .lyrics{width:520px;margin-top:14px;max-height:118px;overflow:hidden;
+          mask-image:linear-gradient(to bottom,transparent,#000 22%,#000 74%,transparent)}
+  .lyrics p{margin:0;line-height:31px;font-size:14px;color:#5E6470}
+  .lyrics p.hi{color:#F3F4F6;font-weight:600}
+  .lyrics p.hi em{color:var(--red);font-style:normal}
+  /* ---------- 右栏 ---------- */
+  .side{display:flex;flex-direction:column;gap:16px;min-height:0}
+  .dj{flex:none;border:1px solid rgba(229,72,77,.38);border-radius:14px;background:
+      linear-gradient(180deg,rgba(229,72,77,.10),rgba(229,72,77,.03) 60%,transparent);padding:16px 16px 14px}
+  .dj .hd{display:flex;align-items:center;gap:8px}
+  .dj .hd .dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(229,72,77,.16)}
+  .dj .hd b{font-size:14px;letter-spacing:.3px}
+  .dj .badge{margin-left:auto;font-size:11px;color:#F2A2A5;padding:2px 8px;border-radius:20px;
+             background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.3)}
+  .dj .desc{margin-top:7px;font-size:12.5px;color:#A9AEB8}
+  .dj .row{display:flex;gap:8px;margin-top:12px}
+  .dj .input{flex:1;height:36px;border-radius:9px;border:1px solid var(--line);background:#12151B;
+             display:flex;align-items:center;padding:0 11px;font-size:12.5px;color:#6E7480}
+  .dj .go{height:36px;padding:0 14px;border-radius:9px;background:var(--red);color:#fff;font-size:12.5px;
+          font-weight:600;display:grid;place-items:center;box-shadow:0 8px 18px -10px rgba(229,72,77,.9)}
+  .queue{flex:1;min-height:0;border:1px solid var(--line);border-radius:14px;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+  .queue .qh{flex:none;display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--line)}
+  .queue .qh b{font-size:13px;font-weight:600}
+  .queue .qh span{font-size:11.5px;color:var(--muted)}
+  .queue .qh .more{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .row{display:flex;align-items:center;gap:11px;padding:9px 14px;position:relative}
+  .row.cur{background:linear-gradient(90deg,rgba(229,72,77,.10),transparent 70%)}
+  .row.cur:before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--red)}
+  .thumb{width:36px;height:36px;border-radius:8px;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .t1{background:linear-gradient(135deg,#243B55,#141E30)}
+  .t2{background:linear-gradient(135deg,#5B2A3A,#1B1420)}
+  .t3{background:linear-gradient(135deg,#1E3B35,#0F1D1A)}
+  .t4{background:linear-gradient(135deg,#3A2F1E,#171310)}
+  .t5{background:linear-gradient(135deg,#2C2A4A,#14131F)}
+  .t6{background:linear-gradient(135deg,#3C2632,#161016)}
+  .txt{min-width:0;flex:1}
+  .txt .n{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .txt .a{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .row.cur .txt .n{color:#FF8A8D}
+  .dur{font-size:11.5px;color:#6E7480;font-variant-numeric:tabular-nums}
+  .acts{display:flex;gap:9px;color:#4C525D;font-size:13px}
+  .acts .ic{width:14px;text-align:center;cursor:default}
+  .row.cur .acts{color:#7A818D}
+  .qfoot{flex:none;display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--line);
+         font-size:11px;color:#5F6570}
+  .qfoot b{font-weight:600;color:#7A818D}
+  /* ---------- 底栏：音量 / 静音 / 音质 ---------- */
+  .playerbar{flex:none;height:54px;display:flex;align-items:center;gap:18px;padding:0 24px;
+             border-top:1px solid var(--line);background:#0B0D11}
+  .pb-lab{font-size:11.5px;color:var(--muted);letter-spacing:.4px}
+  .qsel{display:flex;height:24px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .qsel i{font-style:normal;padding:0 9px;display:grid;place-items:center;font-size:11px;color:#7A818D;
+          font-variant-numeric:tabular-nums;border-left:1px solid var(--line)}
+  .qsel i:first-child{border-left:none}
+  .qsel i.on{background:rgba(229,72,77,.16);color:#FF8A8D;font-weight:600}
+  .vol{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .vol .track{width:104px;height:4px;border-radius:4px;background:#262A33;position:relative}
+  .vol .track i{position:absolute;left:0;top:0;bottom:0;width:62%;border-radius:4px;background:#C9CDD6}
+  .vol .track b{position:absolute;left:62%;top:50%;width:9px;height:9px;border-radius:50%;background:#fff;
+                transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(201,205,214,.14)}
+  .vol .pct{font-size:11px;color:#6E7480;font-variant-numeric:tabular-nums;width:16px}
+  .mute{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:#B9BEC8}
+  .mute svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  @media (max-width:1120px){
+    .app{height:auto;min-height:100vh;overflow:visible}
+    .rail{width:56px}
+    .content{grid-template-columns:minmax(0,1fr);gap:18px;padding:18px}
+    .cover{width:232px;height:232px}
+    .progress,.lyrics{width:100%}
+    .lyrics{max-height:none}
+    .playerbar{flex-wrap:wrap;height:auto;padding:10px 18px;gap:12px}
+    .vol{margin-left:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="logo">D</div>
+    <div class="item"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-3.2-6.4"/><path d="M21 4v4h-4"/></svg></div>
+    <div class="item"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg></div>
+    <div class="item active"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></div>
+    <div class="item"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/></svg></div>
+    <div class="spacer"></div>
+    <div class="item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3.9A7 7 0 0 0 15 5.7L14.6 3h-4l-.4 2.7a7 7 0 0 0-1.6 1.2L6.3 6l-2 3.4L6.3 11a7 7 0 0 0 0 2L4.3 14.6l2 3.4 2.3-.9c.5.5 1 .9 1.6 1.2l.4 2.7h4l.4-2.7c.6-.3 1.1-.7 1.6-1.2l2.3.9 2-3.4-2-1.6c.1-.3.1-.7.1-1Z"/></svg></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>音乐</h1><span class="crumb">/ 正在播放</span>
+      <div class="right">
+        <span>已登录 · 夜航</span>
+        <div class="avatar">夜</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3.9A7 7 0 0 0 15 5.7L14.6 3h-4l-.4 2.7a7 7 0 0 0-1.6 1.2L6.3 6l-2 3.4L6.3 11a7 7 0 0 0 0 2L4.3 14.6l2 3.4 2.3-.9c.5.5 1 .9 1.6 1.2l.4 2.7h4l.4-2.7c.6-.3 1.1-.7 1.6-1.2l2.3.9 2-3.4-2-1.6c.1-.3.1-.7.1-1Z"/></svg>
+      </div>
+    </div>
+
+    <div class="content">
+      <section class="stage">
+        <div class="cover"><div class="mountain"></div><span class="q">320 kbps</span></div>
+        <div class="meta">
+          <div class="title">夜航西飞</div>
+          <div class="artist">陈粒 <span>·</span> 洄游</div>
+          <div class="album">2019 · 独立流行</div>
+        </div>
+        <div class="progress">
+          <div class="bar"><i></i><b></b></div>
+          <div class="times"><span>01:24</span><span>04:26</span></div>
+        </div>
+        <div class="controls">
+          <div class="ctrl"><svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M21 3l-6.5 6.5A7 7 0 1 1 4 12"/></svg></div>
+          <div class="ctrl"><svg viewBox="0 0 24 24"><path d="M18 5v14L8 12z"/><path d="M6 5v14"/></svg></div>
+          <div class="play"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg></div>
+          <div class="ctrl"><svg viewBox="0 0 24 24"><path d="M6 5v14l10-7z"/><path d="M18 5v14"/></svg></div>
+          <div class="ctrl on"><svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4"/><path d="M3 11V9a2 2 0 0 1 2-2h16"/><path d="M7 21l-4-4 4-4"/><path d="M21 13v2a2 2 0 0 1-2 2H3"/></svg></div>
+        </div>
+        <div class="tabs">
+          <div class="t">详情</div><div class="t active">歌词</div><div class="t">画像摘要</div>
+        </div>
+        <div class="lyrics">
+          <p>我听见风 从西边来</p>
+          <p class="hi">吹过你 <em>没说出口的那句</em></p>
+          <p>夜航的人 不看海</p>
+          <p>只看灯 一盏一盏地开</p>
+          <p>如果明天 还有明天</p>
+        </div>
+      </section>
+
+      <section class="side">
+        <div class="dj">
+          <div class="hd"><span class="dot"></span><b>AI DJ</b><span class="badge">已排好 12 首</span></div>
+          <div class="desc">根据你的口味：偏慢速华语、深夜、民谣与独立流行</div>
+          <div class="row">
+            <div class="input">想听点什么？比如：雨天下午，别太吵</div>
+            <div class="go">开始 DJ</div>
+          </div>
+        </div>
+        <div class="queue">
+          <div class="qh"><b>播放队列</b><span>共 12 首 · 约 48 分钟</span><span class="more">清空</span></div>
+          <div class="row cur"><div class="thumb t1"></div><div class="txt"><div class="n">夜航西飞</div><div class="a">陈粒</div></div><div class="dur">04:26</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t2"></div><div class="txt"><div class="n">秦皇岛</div><div class="a">万能青年旅店</div></div><div class="dur">08:12</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t3"></div><div class="txt"><div class="n">披星戴月的想你</div><div class="a">告五人</div></div><div class="dur">04:41</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t4"></div><div class="txt"><div class="n">山海</div><div class="a">草东没有派对</div></div><div class="dur">04:07</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t5"></div><div class="txt"><div class="n">水星记</div><div class="a">郭顶</div></div><div class="dur">04:59</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t6"></div><div class="txt"><div class="n">东北民谣</div><div class="a">毛不易</div></div><div class="dur">04:12</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="row"><div class="thumb t1"></div><div class="txt"><div class="n">关于郑州的记忆</div><div class="a">李志</div></div><div class="dur">05:33</div><div class="acts"><span class="ic" title="红心">♡</span><span class="ic" title="不喜欢（7 天不再推荐）">⊘</span><span class="ic" title="仅移出队列">✕</span></div></div>
+          <div class="qfoot"><b>♡</b> 红心 · <b>⊘</b> 不喜欢（7 天不推荐） · <b>✕</b> 移出队列</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="playerbar">
+      <span class="pb-lab">音质</span>
+      <div class="qsel"><i>128</i><i>192</i><i class="on">320</i></div>
+      <div class="vol">
+        <div class="mute"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg></div>
+        <div class="track"><i></i><b></b></div>
+        <span class="pct">62</span>
+        <div class="mute" title="静音"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
