@@ -2,6 +2,8 @@
 
 DSH 的网易云音乐插件：播放器 + 侧栏面板 + AI 对话控制，外加四项差异化能力——场景歌单、口味画像、听歌周报、歌词二创。
 
+仓库：<https://github.com/harehareya66/music-ai-netease>
+
 **开工先读 [`HANDOFF.md`](./HANDOFF.md)**（交接 + 第一步做什么），执行口径看 [`PLAN.md`](./PLAN.md)（分层设计、目录、里程碑、验收）。
 
 ## 现状（2026-10-22）
