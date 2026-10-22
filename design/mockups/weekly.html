@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>听歌周报 · 概念稿</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
+    --text:#E8EAED; --muted:#8B909A; --red:#E5484D; --teal:#2FB3A6; --amber:#F5A524;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;padding:26px 32px 30px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .back{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+  .back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  h1{font-size:21px;font-weight:600;margin:0;letter-spacing:.4px}
+  .range{font-size:13px;color:var(--muted);margin-left:2px}
+  .share{margin-left:auto;height:32px;padding:0 16px;border-radius:20px;border:1px solid var(--line);
+         background:#13161C;display:grid;place-items:center;font-size:12.5px;color:#B7BCC6}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--card)}
+  /* stat cards */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+  .stat{padding:18px 20px 16px}
+  .stat .k{font-size:11.5px;color:var(--muted);letter-spacing:.4px}
+  .stat .v{font-size:32px;font-weight:600;margin-top:6px;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+  .stat .v small{font-size:14px;font-weight:400;color:#B7BCC6;margin-left:4px}
+  .stat .d{margin-top:4px;font-size:11.5px}
+  .up{color:var(--teal)} .down{color:var(--teal)} .flat{color:#6E7480}
+  /* middle */
+  .grid2{display:grid;grid-template-columns:1.12fr 1fr;gap:16px;margin-bottom:16px}
+  .panel{padding:18px 20px}
+  .panel h3{margin:0 0 2px;font-size:13.5px;font-weight:600}
+  .panel .hint{font-size:11.5px;color:var(--muted)}
+  .trow{display:flex;align-items:center;gap:12px;padding:9px 0}
+  .trow .rk{width:14px;font-size:12px;color:#6E7480;font-variant-numeric:tabular-nums}
+  .cv{width:40px;height:40px;border-radius:8px;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .c1{background:linear-gradient(135deg,#243B55,#141E30)} .c2{background:linear-gradient(135deg,#5B2A3A,#1B1420)}
+  .c3{background:linear-gradient(135deg,#1E3B35,#0F1D1A)} .c4{background:linear-gradient(135deg,#3A2F1E,#171310)}
+  .c5{background:linear-gradient(135deg,#2C2A4A,#14131F)}
+  .trow .nm{flex:1;min-width:0}
+  .trow .nm b{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow .nm span{font-size:11.5px;color:var(--muted)}
+  .cnt{font-size:12.5px;color:#B7BCC6;font-variant-numeric:tabular-nums}
+  .cnt i{font-style:normal;color:#6E7480;font-size:11px;margin-left:3px}
+  .trow.first .nm b{color:#FF8A8D}
+  /* loop card */
+  .loop{display:flex;gap:20px;align-items:center;padding:20px}
+  .loop .art{width:118px;height:118px;border-radius:12px;flex:none;position:relative;
+    background:
+      radial-gradient(circle at 74% 24%, rgba(240,236,220,.85) 0 10px, rgba(240,236,220,0) 11px),
+      radial-gradient(circle at 30% 20%, rgba(120,160,220,.5), transparent 58%),
+      radial-gradient(circle at 80% 86%, rgba(229,72,77,.45), transparent 55%),
+      linear-gradient(165deg,#0A1220,#121A2C 46%,#1B1420);
+    box-shadow:0 18px 40px -22px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,255,255,.06)}
+  .loop .big{font-size:15px;font-weight:600;color:#B7BCC6}
+  .loop .num{font-size:42px;font-weight:600;letter-spacing:.5px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+  .loop .num small{font-size:14px;font-weight:400;color:#8B909A;margin-left:6px}
+  .loop .song{font-size:15px;margin-top:8px}
+  .loop .quote{font-size:12.5px;color:#9AA0AB;margin-top:8px;max-width:300px;line-height:1.7}
+  /* bottom */
+  .grid2b{display:grid;grid-template-columns:1.12fr 1fr;gap:16px}
+  .paper{padding:20px 22px}
+  .paper h3{margin:0 0 10px;font-size:13.5px;font-weight:600}
+  .paper p{margin:0;font-size:15px;line-height:1.95;color:#D6DAE0;letter-spacing:.2px}
+  .paper p i{font-style:normal;color:#FF9EA1}
+  .week{padding:18px 20px}
+  .bars{display:flex;align-items:flex-end;gap:12px;height:96px;margin-top:16px}
+  .bc{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+  .bc .b{width:100%;flex:none;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#4A4F5C,#2A2E38)}
+  .bc.hot .b{background:linear-gradient(180deg,#E5484D,#8E2B33)}
+  .bc .x{font-size:11px;color:var(--muted)}
+  .foot{margin-top:16px;font-size:11.5px;color:#5F6570;text-align:center}
+  @media (max-width:1120px){
+    .stats{grid-template-columns:1fr 1fr}
+    .grid2,.grid2b{grid-template-columns:minmax(0,1fr)}
+    .top{flex-wrap:wrap}
+    .share{margin-left:0}
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <h1>听歌周报</h1><div class="range">10 月 14 日 — 10 月 20 日</div>
+    <div class="share">分享这张周报</div>
+  </div>
+
+  <div class="stats">
+    <div class="card stat"><div class="k">听歌时长</div><div class="v">18.4<small>小时</small></div><div class="d up">↑ 比上周多 12%</div></div>
+    <div class="card stat"><div class="k">曲目数</div><div class="v">214<small>首</small></div><div class="d flat">≈ 每天 31 首</div></div>
+    <div class="card stat"><div class="k">新歌</div><div class="v">39<small>首</small></div><div class="d up">↑ 比上周多 9 首</div></div>
+    <div class="card stat"><div class="k">跳过率</div><div class="v">11<small>%</small></div><div class="d down">↓ 比上周低 3%</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card panel">
+      <h3>本周最爱</h3><div class="hint">按播放次数 · 本周最爱 TOP</div>
+      <div class="trow first"><span class="rk">1</span><span class="cv c1"></span><span class="nm"><b>夜航西飞</b><span>陈粒</span></span><span class="cnt">23<i>次</i></span></div>
+      <div class="trow"><span class="rk">2</span><span class="cv c2"></span><span class="nm"><b>秦皇岛</b><span>万能青年旅店</span></span><span class="cnt">19<i>次</i></span></div>
+      <div class="trow"><span class="rk">3</span><span class="cv c3"></span><span class="nm"><b>披星戴月的想你</b><span>告五人</span></span><span class="cnt">15<i>次</i></span></div>
+      <div class="trow"><span class="rk">4</span><span class="cv c4"></span><span class="nm"><b>山海</b><span>草东没有派对</span></span><span class="cnt">12<i>次</i></span></div>
+      <div class="trow"><span class="rk">5</span><span class="cv c5"></span><span class="nm"><b>水星记</b><span>郭顶</span></span><span class="cnt">11<i>次</i></span></div>
+      <div class="trow"><span class="rk">6</span><span class="cv c1"></span><span class="nm"><b>东北民谣</b><span>毛不易</span></span><span class="cnt">9<i>次</i></span></div>
+      <div class="trow"><span class="rk">7</span><span class="cv c2"></span><span class="nm"><b>关于郑州的记忆</b><span>李志</span></span><span class="cnt">8<i>次</i></span></div>
+    </div>
+
+    <div class="card loop">
+      <div class="art"></div>
+      <div>
+        <div class="big">单曲循环榜 · 第一</div>
+        <div class="num">23<small>次</small></div>
+        <div class="song">《秦皇岛》· 万能青年旅店</div>
+        <div class="quote">你在周三凌晨 1 点听了很多遍，<br>那一小时里，这首歌没断过。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2b">
+    <div class="card paper">
+      <h3>这一周，你</h3>
+      <p>听歌集中在<i>晚上十点到凌晨一点</i>，周三是你的峰值，那天你听了 4 个小时。<br>
+      你比上周更愿意尝试新歌（新歌率 18%），但你最爱的还是那几首老歌——<br>
+      《夜航西飞》这周被你翻出来听了 23 次，比上个月加起来还多。</p>
+    </div>
+
+    <div class="card week">
+      <h3 style="margin:0 0 2px;font-size:13.5px;font-weight:600">每日听歌量</h3>
+      <div class="hint" style="font-size:11.5px;color:var(--muted)">单位：分钟</div>
+      <div class="bars">
+        <div class="bc"><div class="b" style="height:34px"></div><div class="x">一</div></div>
+        <div class="bc"><div class="b" style="height:42px"></div><div class="x">二</div></div>
+        <div class="bc hot"><div class="b" style="height:96px"></div><div class="x">三</div></div>
+        <div class="bc"><div class="b" style="height:50px"></div><div class="x">四</div></div>
+        <div class="bc"><div class="b" style="height:58px"></div><div class="x">五</div></div>
+        <div class="bc"><div class="b" style="height:70px"></div><div class="x">六</div></div>
+        <div class="bc"><div class="b" style="height:54px"></div><div class="x">日</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">数据来自网易云听歌记录与本机播放历史 · 仅在本机生成，不上传</div>
+</body>
+</html>

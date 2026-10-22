@@ -1,0 +1,2526 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      The page/engine boundary this document implements. The engine reads it
+      here rather than trusting the host's own version, because *this document*
+      is what decides whether to defer audio ownership — and unlike the running
+      host module, it is re-read from disk on every plugin mount. Keep it in
+      step with PANEL_CONTRACT in lib/client.js and lib/router.js.
+    -->
+    <meta name="dsh-music-panel-contract" content="2" />
+    <title>Music · music.163.com</title>
+    <style>
+      /* DSH's light palette (base background, primary label, scrollbar). The
+         page follows the shell's theme while it sits inside DSH, and the
+         system's otherwise; see syncShellTheme. Every other colour is mixed
+         from these. */
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --fg: #0f1115;
+        --scrollbar-thumb: #e5e5e5;
+        --scrollbar-thumb-hover: #d4d4d4;
+        --muted: color-mix(in srgb, var(--fg) 56%, transparent);
+        --faint: color-mix(in srgb, var(--fg) 38%, transparent);
+        --line: color-mix(in srgb, var(--fg) 12%, transparent);
+        --panel: color-mix(in srgb, var(--fg) 4%, transparent);
+        --hover: color-mix(in srgb, var(--fg) 7%, transparent);
+        --accent: #e8503a;
+        --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+        --radius: 12px;
+        --gap: 16px;
+      }
+      /* DSH's dark palette: the system's choice standalone, the shell's inside DSH. */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          color-scheme: dark;
+          --bg: #151517;
+          --fg: #f9fafb;
+          --scrollbar-thumb: #3c3c3d;
+          --scrollbar-thumb-hover: #545557;
+        }
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #151517;
+        --fg: #f9fafb;
+        --scrollbar-thumb: #3c3c3d;
+        --scrollbar-thumb-hover: #545557;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        background: var(--bg); color: var(--fg); overflow: hidden;
+      }
+      button, input, select { font: inherit; color: inherit; }
+      button {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+        padding: 5px 10px; cursor: pointer; white-space: nowrap;
+      }
+      button:hover:not(:disabled) { background: var(--hover); }
+      /* The trip to NetEase is not instant on a cold cache; a click has to look
+         like it landed before the rows come back. */
+      button:disabled { opacity: 0.45; cursor: default; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      input, select {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+      }
+      input:focus, select:focus, button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; }
+      /* One icon set, one stroke: every icon on the page is drawn the same way,
+         and a state fills the outline rather than swapping in another glyph. */
+      svg.i { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+      svg.i.filled { fill: currentColor; }
+      svg.i.small { width: 14px; height: 14px; }
+
+      /* Scrollbars as DSH draws them in its conversation and everywhere else
+         (dsh-client-ui-theme's scrollbar.css): a 5px rounded thumb on no
+         track, darker under the pointer. */
+      @supports not selector(::-webkit-scrollbar) {
+        * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+      }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: none; }
+      ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); background-clip: content-box; border-radius: 999px; }
+      ::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
+      ::-webkit-scrollbar-corner { background: none; }
+      /* Inside a card, the thumb keeps clear of the rounded corners, as DSH's own cards do. */
+      .card ::-webkit-scrollbar-track { margin-block: 6px; }
+
+      /* ------------------------------------------------------------ layout
+         Wide: the stage (what is playing) on the left, what comes next — the
+         DJ and the queue — on the right, each column scrolling on its own.
+         Narrow: one column, the whole page scrolling. */
+      #app { display: flex; flex-direction: column; height: 100%; }
+      header {
+        display: flex; align-items: center; gap: 10px; padding: 10px var(--gap);
+        border-bottom: 1px solid var(--line); flex: none;
+      }
+      .brand { font-weight: 650; letter-spacing: 0.2px; }
+      .brand small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+      .spacer { flex: 1; }
+      .feature-nav { display: flex; align-items: center; gap: 2px; }
+      .feature-nav a {
+        color: var(--muted); text-decoration: none; font-size: 13px; padding: 6px 10px;
+        border-radius: 8px; line-height: 1; white-space: nowrap;
+      }
+      .feature-nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+      @media (max-width: 720px) { .feature-nav { display: none; } }
+      .library-cta {
+        display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+        align-self: flex-start; padding: 7px 12px; border-radius: 8px;
+        border: 1px solid var(--line); color: var(--text);
+        text-decoration: none; font-size: 13px;
+      }
+      /* class display beats the [hidden] UA rule, so restate it */
+      .library-cta[hidden] { display: none; }
+      .library-cta:hover { border-color: var(--red); color: #fff; }
+      #account { display: flex; align-items: center; gap: 7px; color: var(--muted); min-width: 0; }
+      #account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #account img { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+
+      main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+      .stage, .side { display: flex; flex-direction: column; gap: var(--gap); padding: var(--gap); min-width: 0; }
+      @media (max-width: 859px) {
+        /* Stacked, the two columns share one gap rather than two paddings. */
+        .side { padding-top: 0; }
+      }
+      @media (min-width: 860px) {
+        main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 30%); overflow: hidden; }
+        .stage { overflow: auto; }
+        .side { overflow: hidden; border-left: 1px solid var(--line); }
+        .side .queue-card { flex: 1; min-height: 0; }
+        .side #queue { overflow: auto; }
+        /* With a column of its own, the details or lyrics fill what the stage
+           leaves. The floor is the header and two lines: any higher and a short
+           window scrolls the whole column as well as the card. */
+        .stage .info-card { flex: 1; min-height: 72px; }
+        .stage .lyrics, .stage .details { flex: 1; max-height: none; }
+      }
+
+      .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+      .card-head {
+        display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px;
+        color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
+      }
+      .card-head .grow { flex: 1; }
+      .link {
+        background: none; border: 0; padding: 0; color: var(--muted); font: inherit;
+        text-transform: inherit; letter-spacing: inherit;
+      }
+      .link:hover:not(:disabled) { background: none; color: var(--fg); }
+
+      /* ------------------------------------------------------------- stage */
+      .np { display: flex; gap: 18px; align-items: flex-end; }
+      /* The frame holds the place, with a note in it, while there is no cover. */
+      .cover {
+        position: relative; width: clamp(96px, 22vw, 180px); aspect-ratio: 1; flex: none;
+        border-radius: var(--radius); overflow: hidden; background: var(--panel);
+        display: grid; place-items: center; color: var(--faint); font-size: 40px;
+        box-shadow: 0 6px 24px color-mix(in srgb, #000 14%, transparent);
+      }
+      #cover-icon { display: grid; place-items: center; width: 38%; height: 38%; }
+      #cover-icon svg.i { width: 100%; height: 100%; stroke-width: 1.5; }
+      #cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .np-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+      .now-title { font-size: 22px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+      .now-artists { font-size: 14px; }
+      .now-album { color: var(--muted); }
+      /* What to do about this track: the taste switchers and the boosts. A
+         state is an accent icon on a tint, never a solid block — the only
+         filled control on the stage is play. */
+      .taste { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+      .taste button {
+        width: 34px; height: 34px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+        background: none; color: var(--muted);
+      }
+      .taste button:hover:not(:disabled) { color: var(--fg); background: var(--hover); }
+      .taste button.on { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+
+      .progress { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; border: 0; padding: 0; height: 16px; flex: 1; min-width: 0; }
+      input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: var(--accent); }
+      input[type="range"]:focus { outline: none; }
+
+      .transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
+      .transport button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: none; border-color: transparent; }
+      .transport button:hover:not(:disabled) { background: var(--hover); }
+      .transport #play { width: 52px; height: 52px; background: var(--accent); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+      .transport #play:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
+      .transport svg.i { width: 20px; height: 20px; }
+      .transport #play svg.i { width: 22px; height: 22px; }
+
+      .secondary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+      .secondary select, .secondary > button { padding: 4px 8px; font-size: 12px; }
+      #quality-info { color: var(--muted); }
+      .volume-control { display: flex; align-items: center; gap: 8px; flex: none; }
+      #mute { background: none; border-color: transparent; padding: 4px; color: var(--muted); }
+      #mute:hover:not(:disabled) { color: var(--fg); }
+      #volume { width: 96px; flex: none; }
+
+      .info-card { display: flex; flex-direction: column; min-height: 0; }
+      .tabs { display: flex; gap: 14px; }
+      .tab {
+        background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 0 0 2px;
+        color: var(--muted); font: inherit; text-transform: inherit; letter-spacing: inherit;
+      }
+      .tab:hover:not(:disabled) { background: none; color: var(--fg); }
+      .tab.on { color: var(--fg); border-bottom-color: var(--accent); }
+      .lyrics[hidden], .details[hidden] { display: none; }
+      /* The pane is a glance at the current line, not a page: a few lines of
+         synced text, scrolled for the rest. `--lyrics-lines` is the single knob. */
+      .lyrics {
+        --lyrics-lines: 6;
+        max-height: calc(var(--lyrics-lines) * 1.6em + var(--lyrics-lines) * 4px + 14px);
+        overflow: auto; padding: 2px 12px 14px; font-size: 14px; line-height: 1.6; scrollbar-width: none;
+      }
+      .lyrics::-webkit-scrollbar { display: none; }
+      .lyrics p { margin: 0; padding: 2px 0; color: var(--faint); transition: color 0.15s; }
+      .lyrics p.on { color: var(--fg); font-weight: 600; }
+
+      /* The song's facts first, then prose about the song, its artists and its
+         album, each clamped to a few lines until clicked. */
+      .details {
+        max-height: 320px; overflow: auto; padding: 2px 12px 14px;
+        display: flex; flex-direction: column; gap: 12px;
+      }
+      .details .alias { color: var(--muted); margin: 0; }
+      .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 14px; margin: 0; }
+      .facts dt { color: var(--muted); }
+      .facts dd { margin: 0; overflow-wrap: anywhere; }
+      .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+      .chip { padding: 0 8px; border-radius: 999px; background: var(--hover); font-size: 12px; }
+      .chip.genre { background: var(--accent-soft); }
+      .about h4 {
+        margin: 0 0 3px; color: var(--muted); font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.6px;
+      }
+      .about .prose {
+        cursor: pointer;
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;
+      }
+      .about .prose.open { display: block; }
+      .about .prose p { margin: 0; }
+      .about .prose p + p { margin-top: 8px; }
+      .about .by { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      .about .badge {
+        margin-left: 6px; padding: 0 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent);
+        font-size: 10px; letter-spacing: 0.4px;
+      }
+      .about .written { cursor: pointer; }
+      .about .written p { margin: 0; }
+      .about .written p + p { margin-top: 8px; }
+      .about .writing { color: var(--muted); margin: 0; }
+      .details .source { align-self: flex-start; font-size: 12px; }
+
+      /* Notices float over the page just below the header instead of taking
+         a place in it: one that comes and goes, such as the autoplay banner,
+         must not move what the listener is about to click. */
+      header { position: relative; }
+      #notices {
+        position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 30;
+        width: max-content; max-width: calc(100% - 2 * var(--gap));
+        display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+      }
+      #notices > * { pointer-events: auto; }
+      .need-gesture {
+        background: color-mix(in srgb, var(--accent) 13%, var(--bg)); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+        border-radius: var(--radius); padding: 8px 12px; font-size: 12px;
+        box-shadow: 0 6px 20px color-mix(in srgb, #000 18%, transparent);
+      }
+
+      /* -------------------------------------------------------------- side */
+      .dj-card { padding-bottom: 12px; flex: none; }
+      .dj-card .card-head { padding-bottom: 8px; }
+      .dj-card .card-head .title { color: var(--fg); font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: 0; }
+      .dj-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px; font-size: 12px; }
+      #dj-prompt { width: 100%; }
+      /* A switch reads on or off at a glance: the DJ, the listening history. */
+      .switch {
+        position: relative; width: 38px; height: 22px; padding: 0; border-radius: 11px;
+        background: color-mix(in srgb, var(--fg) 20%, transparent); border: 0; color: transparent; overflow: hidden;
+      }
+      .switch::after {
+        content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+        background: #fff; transition: transform 0.15s; box-shadow: 0 1px 3px color-mix(in srgb, #000 30%, transparent);
+      }
+      .switch.on { background: var(--accent); }
+      .switch.on::after { transform: translateX(16px); }
+      .switch:hover:not(:disabled) { filter: brightness(0.96); }
+      /* The listening-history switch only means something signed in. */
+      .history { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+      .history[hidden] { display: none; }
+      .plan b { color: var(--accent); }
+      .plan .muted, .muted { color: var(--muted); }
+      .plan > div + div { margin-top: 2px; }
+
+      #boosts:empty { display: none; }
+      #boosts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); }
+      #boosts .boost {
+        display: inline-flex; gap: 2px; align-items: center; color: var(--fg);
+        background: var(--accent-soft); border-radius: 999px; padding: 1px 2px 1px 9px;
+      }
+      #boosts .boost button { border: 0; background: none; padding: 2px 5px; color: var(--muted); }
+      #boosts .boost button:hover:not(:disabled) { color: var(--fg); }
+
+      /* The DJ model picker is a set-once setting, so it keeps only its header
+         row until asked. The header is the click target; the chevron inside it
+         is the keyboard one. */
+      .model { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
+      .model-head { display: flex; align-items: baseline; gap: 8px; cursor: pointer; }
+      .model-head .model-now {
+        flex: 1; min-width: 0; text-align: right; color: var(--muted);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .model-head .toggle { background: none; border: 0; margin: 0; padding: 0 2px; font: inherit; color: var(--muted); }
+      .model-head .toggle:hover:not(:disabled) { background: none; color: var(--fg); }
+      .model-head .warn { color: var(--accent); }
+      .dj-model-body.collapsed { display: none; }
+      .row-inline { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+      .row-inline select, .row-inline input { flex: 1 1 0; min-width: 0; font-size: 12px; padding: 4px 6px; }
+      .row-inline button { font-size: 12px; padding: 4px 8px; }
+
+      .queue-card { display: flex; flex-direction: column; overflow: hidden; }
+      #queue { padding: 0 6px 6px; }
+      .row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; cursor: pointer; }
+      .row:hover { background: var(--hover); }
+      .row.playing { background: var(--accent-soft); }
+      .row.playing .name { color: var(--accent); font-weight: 600; }
+      .row .idx { width: 20px; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; }
+      .row.playing .idx { color: var(--accent); display: grid; justify-items: end; }
+      .row img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex: none; background: var(--panel); }
+      .row .meta { min-width: 0; flex: 1; }
+      .row .name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .row .sub { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .row .tag { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); flex: none; }
+      .row .dur { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; min-width: 32px; text-align: right; }
+      .row .acts { display: none; gap: 4px; flex: none; }
+      .row .acts button { padding: 3px 5px; background: none; color: var(--muted); }
+      .row .acts button:hover:not(:disabled) { color: var(--fg); }
+      .row:hover .acts { display: flex; }
+      /* The list's own like control. A liked track keeps its filled heart
+         visible; the hollow one only appears on hover, so an unrated list is
+         not a wall of outlines. */
+      .row .heart {
+        background: none; border: 0; padding: 0; flex: none;
+        color: var(--muted); opacity: 0; transition: opacity 0.12s;
+      }
+      .row:hover .heart { opacity: 1; }
+      .row .heart.on { opacity: 1; color: var(--accent); }
+      .empty { padding: 24px 14px; color: var(--muted); text-align: center; }
+
+      .toast {
+        position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+        background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 9px; font-size: 12px;
+        opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 40; max-width: 80%;
+      }
+      .toast.on { opacity: 0.94; }
+      dialog {
+        border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--fg);
+        padding: 18px; width: min(340px, 88vw);
+      }
+      dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+      #qr { display: block; margin: 12px auto; width: 220px; height: 220px; image-rendering: pixelated; border-radius: 8px; background: #fff; padding: 8px; }
+      .hint { color: var(--muted); font-size: 12px; text-align: center; }
+      .lyrics .hint, .details .hint { text-align: left; margin: 0; }
+      .row-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="brand"><span data-i18n="brand">Music</span><small>music.163.com</small></div>
+        <div class="spacer"></div>
+        <!-- The side pages; the panel itself stays the player only. -->
+        <nav class="feature-nav" aria-label="功能页">
+          <a href="__BASE__/library">曲库</a>
+          <a href="__BASE__/taste">画像</a>
+          <a href="__BASE__/weekly">周报</a>
+          <a href="__BASE__/scene">场景</a>
+          <a href="__BASE__/lyric">歌词二创</a>
+        </nav>
+        <div class="history" id="history" hidden>
+          <span id="history-label" data-i18n="scrobbleLabel">Listening history</span>
+          <button id="scrobble-toggle" class="switch" role="switch" aria-labelledby="history-label"></button>
+        </div>
+        <div id="account"></div>
+        <div id="notices" aria-live="polite"></div>
+      </header>
+
+      <main>
+        <section class="stage">
+          <div class="np">
+            <div class="cover"><span id="cover-icon"></span><img id="cover" alt="" /></div>
+            <div class="np-text">
+              <div class="now-title" id="np-title" data-i18n="nothingPlaying">Nothing playing</div>
+              <div class="now-artists" id="np-artists"></div>
+              <div class="now-album" id="np-album"></div>
+              <!-- Labels are state-dependent (a filled heart un-likes), so the
+                   script owns text and title rather than data-i18n. -->
+              <div class="taste">
+                <button id="like" title="Like"></button>
+                <button id="dislike" title="Dislike"></button>
+                <button id="boost-more" title="More like this for an hour"></button>
+                <button id="boost-less" title="Fewer like this for an hour"></button>
+              </div>
+              <!-- Signed in but nothing playing is the first screen a new user
+                   sees; offer the one useful next step instead of a dead end. -->
+              <a class="library-cta" id="library-cta" href="__BASE__/library" hidden>去曲库挑一张歌单 →</a>
+            </div>
+          </div>
+
+          <div class="progress">
+            <span id="t-cur">0:00</span>
+            <input type="range" id="seek" min="0" max="1000" value="0" step="1" />
+            <span id="t-dur">0:00</span>
+          </div>
+          <div class="transport">
+            <button id="prev" data-i18n-title="prev" title="Previous"></button>
+            <button id="play" data-i18n-title="playPause" title="Play/pause"></button>
+            <button id="next" data-i18n-title="next" title="Next"></button>
+          </div>
+          <div class="secondary">
+            <button id="mode" data-i18n-title="modeTitle" data-i18n="modeList" title="Playback mode">List</button>
+            <select id="quality" data-i18n-title="qualityTitle" title="Streaming quality"></select>
+            <span id="quality-info"></span>
+            <span class="spacer"></span>
+            <div class="volume-control">
+              <button id="mute" data-i18n-title="mute" title="Mute"></button>
+              <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
+            </div>
+          </div>
+
+          <div class="card info-card">
+            <div class="card-head">
+              <div class="tabs" role="tablist">
+                <button id="tab-details" class="tab" type="button" role="tab" data-i18n="details">Details</button>
+                <button id="tab-lyrics" class="tab" type="button" role="tab" data-i18n="lyrics">Lyrics</button>
+              </div>
+            </div>
+            <div class="details" id="details" role="tabpanel"><p class="hint">—</p></div>
+            <div class="lyrics" id="lyrics" role="tabpanel" hidden><p class="hint">—</p></div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <div class="card dj-card">
+            <div class="card-head">
+              <span class="title">AI DJ</span>
+              <span class="grow"></span>
+              <button id="dj-toggle" class="switch" role="switch" data-i18n-title="djToggleTitle" title="Continuous AI DJ: keep the queue stocked">AI DJ</button>
+            </div>
+            <div class="dj-body">
+              <input id="dj-prompt" data-i18n-ph="djPromptPh" placeholder="AI DJ mood, e.g. rainy afternoon jazz" />
+              <div id="dj-status"></div>
+              <div id="boosts"></div>
+              <div class="model" id="dj-model">
+                <!-- One always-visible line: the setting that matters at a glance is
+                     the effective route, and the form below it is folded away until
+                     asked for. -->
+                <div class="model-head" id="dj-model-head">
+                  <span data-i18n="djModel">DJ model</span>
+                  <span class="model-now"><span id="dj-model-route"></span><span id="dj-model-source"></span><span class="warn" id="dj-model-warn"></span></span>
+                  <button id="dj-model-toggle" class="toggle" type="button" aria-controls="dj-model-body" aria-expanded="false"></button>
+                </div>
+                <div class="dj-model-body collapsed" id="dj-model-body">
+                  <div class="row-inline">
+                    <select id="dj-provider" title="provider route"></select>
+                    <select id="dj-model-select" title="model"></select>
+                  </div>
+                  <div class="row-inline">
+                    <input id="dj-model-custom" data-i18n-ph="customModelPh" placeholder="Custom model id" style="display: none" />
+                  </div>
+                  <div class="row-inline">
+                    <button id="dj-model-save" class="primary" data-i18n="save">Save</button>
+                    <button id="dj-model-test" data-i18n="test">Test</button>
+                    <button id="dj-model-clear" data-i18n="revert" data-i18n-title="revertTitle" title="Revert to the profile patch">Revert</button>
+                  </div>
+                  <div id="dj-model-status" class="muted"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card queue-card">
+            <div class="card-head">
+              <span data-i18n="queue">Queue</span> <span id="counts"></span>
+              <span class="grow"></span>
+              <button id="queue-clear" class="link" type="button" data-i18n="clearQueue" data-i18n-title="clearQueueTitle">Clear</button>
+            </div>
+            <div id="queue"></div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="login">
+      <div style="font-weight: 650" data-i18n="loginTitle">NetEase Cloud Music sign in</div>
+      <canvas id="qr" width="220" height="220"></canvas>
+      <div class="hint" id="qr-state">Fetching QR…</div>
+      <div class="row-actions">
+        <button id="qr-refresh" data-i18n="refresh">Refresh</button>
+        <button id="qr-close" class="primary" data-i18n="close">Close</button>
+      </div>
+    </dialog>
+    <div class="toast" id="toast"></div>
+
+    <script src="__BASE__/vendor/qrcode.js"></script>
+    <script src="__BASE__/playback.js"></script>
+    <script>
+      // ------------------------------------------------------------------ setup
+      const BASE = '__BASE__';
+      const API = BASE + '/api';
+      const $ = (id) => document.getElementById(id);
+
+      // ------------------------------------------------------------------ i18n
+      /**
+       * Locale, without ctx.
+       *
+       * This page is served as a plain document, not a client module, so the
+       * host's `ctx.locale` service is out of reach. The shell keeps its own
+       * `<html lang>` in sync with the active locale, though, and this frame
+       * is same-origin with the shell — reading the parent's `lang`, and
+       * observing it for changes, follows the Settings language live. When
+       * the page is opened standalone there is no parent to follow, so the
+       * browser's own language decides.
+       */
+      const DICT = {
+        zh: {
+          brand: '音乐',
+          djPromptPh: '例如：雨天的下午，别太吵',
+          djToggleTitle: '持续 AI DJ：自动补歌',
+          nothingPlaying: '未播放',
+          prev: '上一首',
+          playPause: '播放/暂停',
+          next: '下一首',
+          modeTitle: '播放模式',
+          modeList: '列表',
+          modeSingle: '单曲',
+          modeShuffle: '随机',
+          qualityTitle: '流媒体音质',
+          like: '喜欢',
+          unlike: '取消喜欢',
+          dislike: '不喜欢',
+          undislike: '取消不喜欢',
+          likeNeedsSignIn: '登录后才能在网易云标记喜欢',
+          mute: '静音',
+          lyrics: '歌词',
+          details: '详情',
+          noDetails: '暂无这首歌的信息',
+          album: '专辑',
+          albumTracks: '{n} 首',
+          genre: '曲风',
+          tags: '标签',
+          language: '语种',
+          featuredIn: '影视节目',
+          awards: '获奖',
+          aboutSong: '关于这首歌',
+          aboutAlbum: '关于专辑',
+          reviewBy: '乐评来自 {name}',
+          intro: '简介',
+          introWriting: '正在撰写简介…',
+          introFromNetease: '查看网易云音乐的介绍',
+          introFromAi: '查看 AI 简介',
+          introToNetease: '点击查看网易云音乐的介绍',
+          expand: '点击展开或收起',
+          queue: '播放队列',
+          djModel: 'AI DJ 模型',
+          djModelToggleShow: '展开模型设置',
+          djModelToggleHide: '收起模型设置',
+          customModelPh: '自定义 model id',
+          save: '保存',
+          test: '测试',
+          revert: '回退',
+          revertTitle: '回退到 profile 配置',
+          loginTitle: '网易云音乐登录',
+          qrFetching: '正在获取二维码…',
+          qrScan: '用网易云音乐 App 扫码',
+          refresh: '刷新',
+          close: '关闭',
+          signin: '登录',
+          loginWaiting: '等待扫码',
+          loginScanned: '已扫码，请在手机上确认',
+          loginExpired: '二维码已过期，已刷新',
+          loginSuccess: '登录成功',
+          loginIdle: '未开始',
+          pollFailed: '轮询失败：',
+          resuming: '正在恢复播放…',
+          djPlanning: 'AI DJ 正在选曲…',
+          modelTierUnavailable: '模型层不可用',
+          djStocking: '持续补歌中',
+          gestureText: '浏览器需要你先与页面交互一次才会播放声音',
+          gesturePlay: '点击播放',
+          gestureNote: '在窗口任意处点击也可以',
+          queueEmpty: '队列为空，用 AI DJ 或让助手补歌',
+          remove: '移除',
+          removed: '已移除',
+          clearQueue: '清空',
+          clearQueueTitle: '清空队列，保留正在播放的歌曲；不会给歌曲打分',
+          loading: '加载中…',
+          instrumental: '纯音乐，无歌词',
+          other: '其他…',
+          noProvider: '(无 provider)',
+          srcPanel: '面板',
+          srcConfig: '配置',
+          srcAgentDefault: '会话模型',
+          srcDiscovered: '自动',
+          hostPredatesLong:
+            '宿主模块早于本功能：请完全退出并重新启动 Harness（关闭窗口不够，它会留在托盘里）',
+          hostPredatesShort: '宿主模块早于本功能',
+          pickProviderModel: '请先选择 provider 与 model',
+          saved: '已保存 {route}',
+          reverted: '已回退到 profile 配置',
+          testing: '测试中…',
+          heuristics: '已用启发式',
+          downgraded: '已降级',
+          qualitySet: '音质已设为 {level}',
+          liked: '已喜欢',
+          unliked: '已取消喜欢',
+          disliked: '不再推荐',
+          boostMore: '接下来一小时多放类似的',
+          boostLess: '接下来一小时少放类似的',
+          boostClear: '取消临时偏好',
+          boostedMore: '接下来一小时多放类似的',
+          boostedLess: '接下来一小时少放类似的',
+          boostCleared: '已取消临时偏好',
+          boostsTitle: '临时偏好',
+          boostMinutes: '{n} 分钟',
+          scrobbleLabel: '听歌记录',
+          scrobbleOnTitle: '播放计入网易云听歌记录（最近播放、听歌排行）——点击停止',
+          scrobbleOffTitle: '播放只留在本地——点击计入网易云听歌记录',
+          scrobbleOn: '播放将计入网易云听歌记录',
+          scrobbleOff: '播放不再计入听歌记录',
+          djOn: 'AI DJ 已开启',
+          djOff: 'AI DJ 已关闭',
+          connectFailed: '连接失败：',
+          'quality.jymaster': '超清母带',
+          'quality.dolby': '杜比全景声',
+          'quality.sky': '沉浸环绕声',
+          'quality.jyeffect': '沉浸声',
+          'quality.hires': 'Hi-Res 无损',
+          'quality.lossless': '无损',
+          'quality.exhigh': '极高 320 kbps',
+          'quality.higher': '较高 192 kbps',
+          'quality.standard': '标准 128 kbps',
+        },
+        en: {
+          brand: 'Music',
+          djPromptPh: 'AI DJ mood, e.g. rainy afternoon jazz',
+          djToggleTitle: 'Continuous AI DJ: keep the queue stocked',
+          nothingPlaying: 'Nothing playing',
+          prev: 'Previous',
+          playPause: 'Play/pause',
+          next: 'Next',
+          modeTitle: 'Playback mode',
+          modeList: 'List',
+          modeSingle: 'Single',
+          modeShuffle: 'Shuffle',
+          qualityTitle: 'Streaming quality',
+          like: 'Like',
+          unlike: 'Unlike',
+          dislike: 'Dislike',
+          undislike: 'Undislike',
+          likeNeedsSignIn: 'Sign in to NetEase to like tracks',
+          mute: 'Mute',
+          lyrics: 'Lyrics',
+          details: 'Details',
+          noDetails: 'No details for this song',
+          album: 'Album',
+          albumTracks: '{n} tracks',
+          genre: 'Genre',
+          tags: 'Tags',
+          language: 'Language',
+          featuredIn: 'Featured in',
+          awards: 'Awards',
+          aboutSong: 'About the song',
+          aboutAlbum: 'About the album',
+          reviewBy: 'Review by {name}',
+          intro: 'Introduction',
+          introWriting: 'Writing an introduction…',
+          introFromNetease: 'Show what NetEase says',
+          introFromAi: 'Show the AI introduction',
+          introToNetease: 'Click to show what NetEase says',
+          expand: 'Click to expand or collapse',
+          queue: 'Queue',
+          djModel: 'DJ model',
+          djModelToggleShow: 'Show the model settings',
+          djModelToggleHide: 'Hide the model settings',
+          customModelPh: 'Custom model id',
+          save: 'Save',
+          test: 'Test',
+          revert: 'Revert',
+          revertTitle: 'Revert to the profile patch',
+          loginTitle: 'NetEase Cloud Music sign in',
+          qrFetching: 'Fetching QR…',
+          qrScan: 'Scan with the NetEase app',
+          refresh: 'Refresh',
+          close: 'Close',
+          signin: 'Sign in',
+          loginWaiting: 'Waiting for scan',
+          loginScanned: 'Scanned — confirm on your phone',
+          loginExpired: 'QR expired; a fresh one is shown',
+          loginSuccess: 'Signed in',
+          loginIdle: 'Not started',
+          pollFailed: 'Poll failed: ',
+          resuming: 'Resuming…',
+          djPlanning: 'AI DJ is planning…',
+          modelTierUnavailable: 'model tier unavailable',
+          djStocking: 'keeping the queue stocked',
+          gestureText: 'Chromium needs one interaction with this window before it will play audio',
+          gesturePlay: 'Play',
+          gestureNote: 'clicking anywhere works too',
+          queueEmpty: 'Queue empty — use the AI DJ or ask the assistant to add songs',
+          remove: 'Remove',
+          removed: 'Removed',
+          clearQueue: 'Clear',
+          clearQueueTitle: 'Clear the queue, keeping the song playing; no song is rated',
+          loading: 'Loading…',
+          instrumental: 'Instrumental',
+          other: 'Other…',
+          noProvider: '(no provider)',
+          srcPanel: 'panel',
+          srcConfig: 'profile',
+          srcAgentDefault: 'session model',
+          srcDiscovered: 'auto',
+          hostPredatesLong:
+            'The host module predates this feature — fully quit and relaunch the harness (closing the window is not enough; it stays running in the tray)',
+          hostPredatesShort: 'Host module predates this feature',
+          pickProviderModel: 'Pick a provider and a model first',
+          saved: 'Saved {route}',
+          reverted: 'Reverted to the profile config',
+          testing: 'Testing…',
+          heuristics: 'heuristics used',
+          downgraded: 'downgraded',
+          qualitySet: 'Quality set to {level}',
+          liked: 'Liked',
+          unliked: 'Like removed',
+          disliked: 'Disliked',
+          boostMore: 'More like this for an hour',
+          boostLess: 'Fewer like this for an hour',
+          boostClear: 'Clear this boost',
+          boostedMore: 'More like this for the next hour',
+          boostedLess: 'Fewer like this for the next hour',
+          boostCleared: 'Boost cleared',
+          boostsTitle: 'Boosts',
+          boostMinutes: '{n} min',
+          scrobbleLabel: 'Listening history',
+          scrobbleOnTitle: 'Plays are added to your NetEase listening history (最近播放, 听歌排行) — click to stop',
+          scrobbleOffTitle: 'Plays stay local — click to add them to your NetEase listening history',
+          scrobbleOn: 'Plays will be added to your NetEase listening history',
+          scrobbleOff: 'Plays will stay local',
+          djOn: 'AI DJ on',
+          djOff: 'AI DJ off',
+          connectFailed: 'Cannot reach the host: ',
+          'quality.jymaster': 'Master',
+          'quality.dolby': 'Dolby Atmos',
+          'quality.sky': 'Immersive',
+          'quality.jyeffect': 'Spatial',
+          'quality.hires': 'Hi-Res lossless',
+          'quality.lossless': 'Lossless',
+          'quality.exhigh': '320 kbps',
+          'quality.higher': '192 kbps',
+          'quality.standard': '128 kbps',
+        },
+      };
+      let LANG = 'en';
+
+      function detectLang() {
+        // 中文单语产品（PLAN D1）：面板永远说中文，不跟随宿主机语言，也不留英文
+        // 兜底——两套文案迟早会不一致，且验收只看中文一版。
+        return 'zh';
+      }
+
+      /** Translate a key, interpolating `{name}` placeholders from `vars`. */
+      /**
+       * The page's one icon set: Lucide (https://lucide.dev, ISC licence), drawn
+       * as 24px outlines. DSH shares no icon set with plugins — the shell's
+       * module table holds React, Cordis and its UI primitives, none an icon
+       * library — and this page is its own document, so it carries its own.
+       * A state fills an outline (a liked heart) rather than swapping glyphs.
+       */
+      const ICONS = {
+        play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+        pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+        skipBack: '<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/>',
+        skipForward: '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>',
+        volume: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+        muted: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
+        heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+        x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        more: '<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
+        less: '<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
+        music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      };
+
+      function paintStaticIcons() {
+        setIcon($('prev'), 'skipBack');
+        setIcon($('next'), 'skipForward');
+        setIcon($('dislike'), 'x');
+        setIcon($('boost-more'), 'more');
+        setIcon($('boost-less'), 'less');
+        setIcon($('cover-icon'), 'music');
+      }
+
+      /**
+       * The listening-history switch: shown only signed in — there is no history
+       * to write to otherwise — and on when plays are being reported.
+       */
+      function paintHistory() {
+        const scrobble = state?.scrobble;
+        const signedIn = Boolean(state?.authenticated);
+        $('history').hidden = !signedIn || !scrobble;
+        const on = Boolean(scrobble?.enabled);
+        $('scrobble-toggle').classList.toggle('on', on);
+        $('scrobble-toggle').setAttribute?.('aria-checked', String(on));
+        $('scrobble-toggle').title = t(on ? 'scrobbleOnTitle' : 'scrobbleOffTitle');
+      }
+
+      /** One icon as markup; `filled` fills the outline, `small` is the compact size. */
+      function icon(name, { filled = false, small = false } = {}) {
+        const classes = ['i', filled ? 'filled' : '', small ? 'small' : ''].filter(Boolean).join(' ');
+        return `<svg class="${classes}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+      }
+
+      /** Paint an icon into `el`, touching the DOM only when it changes. */
+      function setIcon(el, name, options = {}) {
+        const key = `${name}${options.filled ? ':filled' : ''}`;
+        if (!el || el.dataset.icon === key) return;
+        el.dataset.icon = key;
+        el.innerHTML = icon(name, options);
+      }
+
+      /** The markup `setHtml` last wrote into each element. */
+      const painted = new WeakMap();
+
+      /**
+       * Replace `el`'s markup only when it differs from what was last written.
+       * Rewriting identical rows on every update replaced every node in them,
+       * which dropped hover, focus and a click caught mid-swap.
+       *
+       * @returns {boolean} whether the markup was written.
+       */
+      function setHtml(el, html) {
+        if (!el || painted.get(el) === html) return false;
+        painted.set(el, html);
+        el.innerHTML = html;
+        return true;
+      }
+
+      /** Set `el`'s text only when it changes; a rewrite clears a selection in it. */
+      function setText(el, text) {
+        if (el && el.textContent !== text) el.textContent = text;
+      }
+
+      function t(key, vars) {
+        let text = DICT[LANG]?.[key] ?? DICT.en[key] ?? key;
+        if (vars) {
+          for (const name of Object.keys(vars)) {
+            text = text.split('{' + name + '}').join(String(vars[name]));
+          }
+        }
+        return text;
+      }
+
+      /** Static markup carries `data-i18n*` attributes; this applies them. */
+      function applyStaticStrings() {
+        for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+        for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
+        for (const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder = t(el.dataset.i18nPh);
+      }
+
+      /** Re-apply every user-visible string after a language switch. */
+      function applyLocale() {
+        LANG = detectLang();
+        try {
+          document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+        } catch { /* headless */ }
+        applyStaticStrings();
+        // The model toggle's label depends on its fold, not on a fixed key, so
+        // it is painted rather than carried as data-i18n.
+        paintDjModelToggle();
+        // The details carry translated labels around NetEase's own text.
+        if (infoView === 'details') repaintDetails();
+        // The gesture hint carries markup; drop it so render() rebuilds it in
+        // the new language.
+        $('gesture')?.remove();
+        render();
+        // The taste titles carry no `data-i18n`, and `render()` needs a state
+        // document, so they are painted here as well — otherwise a zh shell
+        // shows them in English until the first state lands.
+        paintTaste();
+        paintDjModelHeader();
+        paintDjModelToggle();
+        paintQualityOptions();
+        if (modelRoutes.length) renderModelOptions();
+      }
+
+      /** Follow the shell's language while this page lives inside it. */
+      /** The shell's colours this page takes on, by the shell's variable name. */
+      const SHELL_COLORS = [
+        ['--dsw-alias-bg-base', '--bg'],
+        ['--dsw-alias-label-primary', '--fg'],
+        ['--dsh-scrollbar-thumb', '--scrollbar-thumb'],
+        ['--dsh-scrollbar-thumb-hover', '--scrollbar-thumb-hover'],
+      ];
+
+      /**
+       * Follow the shell's theme. DSH marks dark with `data-ds-dark-theme` on
+       * its body and paints from token variables there; this page takes the
+       * mark, then the live colours, so a custom DSH theme carries over too.
+       * A theme switch rewrites those attributes and styles, so watching them
+       * catches every switch. Standalone, the system's preference decides.
+       */
+      function syncShellTheme() {
+        try {
+          const shell = window.parent?.document;
+          if (!shell?.body || shell === document) return;
+          const copy = () => {
+            const root = document.documentElement;
+            root.dataset.theme = shell.body.hasAttribute('data-ds-dark-theme') ? 'dark' : 'light';
+            const computed = getComputedStyle(shell.body);
+            for (const [from, to] of SHELL_COLORS) {
+              const value = computed.getPropertyValue(from).trim();
+              if (value) root.style.setProperty(to, value);
+              else root.style.removeProperty(to);
+            }
+          };
+          copy();
+          if (typeof MutationObserver !== 'function') return;
+          const observer = new MutationObserver(copy);
+          for (const node of [shell.documentElement, shell.body]) observer.observe(node, { attributes: true, attributeFilter: ['style', 'class', 'data-ds-dark-theme'] });
+        } catch { /* standalone, or the shell is out of reach */ }
+      }
+
+      function watchShellLocale() {
+        try {
+          const root = window.parent?.document?.documentElement;
+          if (!root || typeof MutationObserver !== 'function') return;
+          new MutationObserver(applyLocale).observe(root, { attributes: true, attributeFilter: ['lang'] });
+        } catch { /* standalone */ }
+      }
+
+      /** Last state document from the host. */
+      let state = null;
+      let lyric = null;
+      let lyricLine = -1;
+      /** Track whose lyrics belong in the pane; drives the fetch, per track. */
+      let lyricTrackId = null;
+      /** Bumped per request so a slow reply for a skipped track is discarded. */
+      let lyricRequest = 0;
+      /** Lyric answers by track, the last 30 kept, so a prefetched track paints without a loading flash. */
+      const lyricCache = new Map();
+      /** Lyric requests in flight, so playback and a prefetch share one. */
+      const lyricLoads = new Map();
+      /** Local-storage key for which pane the info card shows: `details` or `lyrics`. */
+      const INFO_VIEW_PREF = 'dsh-music.info.view';
+      let infoView = readInfoViewPref();
+      /** Track whose details belong in the pane, as `lyricTrackId` is for lyrics. */
+      let detailsTrackId = null;
+      let detailsRequest = 0;
+      /** Details already fetched, by track id, so switching back is instant. */
+      const detailsCache = new Map();
+      /** Details being fetched, by track id, so a prefetch and a load share one request. */
+      const detailsLoads = new Map();
+      /**
+       * Model-written introductions by `<track id>:<language>`: `'pending'`
+       * while one is being written, then `{text}`, empty when none could be.
+       */
+      const intros = new Map();
+      /** Whether the last introduction came back empty, so the next track shows NetEase's prose while it waits. */
+      let introsUnavailable = false;
+      /** Which introduction the details show: `ai`, or NetEase's own (`netease`). Back to `ai` per track. */
+      let introSource = 'ai';
+      /** Local-storage key for whether the DJ model form is unfolded. */
+      const DJ_MODEL_PREF = 'dsh-music.djmodel.expanded';
+      let djModelExpanded = readDjModelPref();
+      let volumePostAt = 0;
+
+      const fmt = (ms) => {
+        const total = Math.max(Math.floor((ms || 0) / 1000), 0);
+        return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+      };
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+      /** Whether the host's event stream is open; see the boot section. */
+      let streaming = false;
+      /** The newest snapshot version adopted; see {@link newest}. */
+      let versionFloor = 0;
+
+      /**
+       * `next`, unless it is older than the state already shown — then the
+       * state shown. A request's answer and a pushed frame travel on different
+       * connections, so one read earlier can land later, and adopting it would
+       * undo the newer one with nothing coming to repair it. Answers are
+       * ordered by `version`, which moves with anything shown — not `rev`,
+       * which a setting or a resolved like leaves alone. Only while the stream
+       * is open: without it the next poll repairs any such swap, and a
+       * reconnect drops the floor, since a restarted host counts its versions
+       * from zero again.
+       */
+      function newest(next) {
+        const version = Number(next?.version);
+        if (!Number.isFinite(version)) return next;
+        if (streaming && version < versionFloor) return state;
+        versionFloor = version;
+        return next;
+      }
+
+      let toastTimer;
+      function toast(message) {
+        const el = $('toast');
+        el.textContent = message;
+        el.classList.add('on');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
+      }
+
+      async function api(path, options) {
+        const response = await fetch(API + path, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options,
+          ...(options && options.body ? { body: JSON.stringify(options.body) } : {}),
+        });
+        const text = await response.text();
+        let data;
+        try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text.slice(0, 200) }; }
+        if (!response.ok) {
+          const error = new Error(data.error || data.message || 'HTTP ' + response.status);
+          // The host's machine-usable half. This page localizes around it
+          // (login does the same) instead of showing a raw English sentence.
+          if (data.code) error.code = data.code;
+          throw error;
+        }
+        return data;
+      }
+
+      /**
+       * Tell the host a user-facing failure in the page's own language when the
+       * reason is one the page knows, and let the host's words through when it
+       * is not (a NetEase refusal carries its own explanation).
+       */
+      function failureText(error) {
+        if (error.code === 'ANONYMOUS') return t('likeNeedsSignIn');
+        return error.message;
+      }
+
+      // ------------------------------------------------------------- transport
+      /**
+       * Who plays the audio.
+       *
+       * Normally the client plugin's engine in the shell document owns it: the
+       * layout renders only the ACTIVE `main` slot entry, so this document is
+       * unmounted the moment the user opens a session, and playback has to
+       * outlive that. The page is then a remote control over the host's state.
+       *
+       * The engine is not guaranteed to exist or to be usable, though: this
+       * page is re-read from disk on every plugin mount, while the browser
+       * bundle it pairs with is pinned to its own revision. When they disagree
+       * the engine declares itself inert. Rather than go silent, this page then
+       * owns the `<audio>` element itself — the older behaviour, which still
+       * plays, only without surviving a panel switch.
+       */
+      function shellEngine() {
+        try {
+          const candidate = window.parent?.__dshMusicEngine;
+          // Only an engine that declares it actually plays is authoritative;
+          // anything else (including an older bundle's engine) would leave the
+          // audio element unowned.
+          return candidate?.playback === true ? candidate : undefined;
+        } catch {
+          return undefined;
+        }
+      }
+
+      /** @type {object | undefined} */
+      let localTransport;
+
+      /** The active transport, creating the local fallback on first use. */
+      function transport() {
+        const engine = shellEngine();
+        if (engine) {
+          if (localTransport) {
+            localTransport.dispose();
+            localTransport = undefined;
+          }
+          return engine;
+        }
+        if (!localTransport) {
+          // Stand down any engine that cannot play, so exactly one transport
+          // owns the audio element and nothing plays twice.
+          try { window.parent?.__dshMusicEngine?.dispose?.(); } catch { /* ignore */ }
+          localTransport = createLocalTransport();
+        }
+        return localTransport;
+      }
+
+      /**
+       * Origin that serves audio bytes. Under the desktop shell this page runs on
+       * the `dsh-app://` custom scheme, which Chromium cannot byte-range, so seeks
+       * restart the track; the shell publishes its HTTP origin on the parent
+       * window instead. Without one, relative URLs keep the page's own origin.
+       */
+      function streamOrigin() {
+        try {
+          const base = window.parent?.__DSH_TRANSPORT__?.streamBaseUrl;
+          if (typeof base === 'string' && base) return new URL(base).origin;
+        } catch { /* a cross-origin parent, or a malformed base */ }
+        return '';
+      }
+
+      /**
+       * The fallback transport: this page owns an `<audio>` element.
+       *
+       * It runs the shell engine's playback core, `playback.js`, which this
+       * page loads from its own host rather than from the bundle — the bundle
+       * is exactly what this fallback cannot trust. The core reconciles on
+       * `transportRev` but enforces play/pause on every update, as the engine
+       * does: a refused `play()` does not change the revision, so gating the
+       * retry would stop the music for good after the first browser refusal.
+       */
+      function createLocalTransport() {
+        const playback = window.__dshMusicPlayback.createPlayback({
+          base: BASE,
+          streamOrigin,
+          call: api,
+          report(extra) {
+            if (!state?.current) return;
+            api('/report', {
+              method: 'POST',
+              body: { trackId: state.current.id, ...playback.progress(), ...extra },
+            }).catch(() => { /* the next update carries the host's view */ });
+          },
+        });
+        playback.audio.addEventListener('timeupdate', () => { paintProgress(); paintLyrics(); });
+
+        return {
+          playback: true,
+          local: true,
+          apply: playback.apply,
+          sync() { playback.apply(state); },
+          playNow: playback.playNow,
+          /** Exact position: this transport owns the element. A held seek counts as already there. */
+          position: playback.position,
+          dispose: playback.dispose,
+        };
+      }
+
+      /** Push the latest host state into whichever transport is active. */
+      function applyTransport() {
+        const active = transport();
+        try {
+          active.apply?.(state);
+        } catch { /* a failing transport must not break rendering */ }
+      }
+
+      /** Ask the active transport to act now instead of on its next update. */
+      function pokeEngine() {
+        try { transport().sync?.(); } catch { /* best effort across documents */ }
+      }
+
+      async function control(body) {
+        try {
+          state = newest(await api('/control', { method: 'POST', body }));
+          render();
+          applyTransport();
+        } catch (error) { toast(error.message); }
+        pokeEngine();
+      }
+
+      /**
+       * Playback position.
+       *
+       * The transport reads its own element when it can — the local one, and
+       * the shell engine, whose document this page can reach. An engine from
+       * an older bundle has no `position()`, so its last report to the host is
+       * used, with the time since added back; the host pushes no frame for a
+       * report that only moves the position, so that report can be minutes old.
+       */
+      function positionMs() {
+        const active = transport();
+        if (typeof active.position === 'function') return active.position();
+        const reported = state?.reported ?? {};
+        const base = Number(reported.position) || 0;
+        if (!state?.playing || !reported.playing) return base;
+        const at = Number(reported.at) || 0;
+        return at ? base + Math.max(Date.now() - at, 0) : base;
+      }
+
+      /** Duration the transport knows, falling back to the track's metadata. */
+      function durationMs() {
+        const reported = Number(state?.reported?.duration) || 0;
+        return reported > 0 ? reported : Number(state?.current?.duration) || 0;
+      }
+
+      /**
+       * The host wants playback, and the transport reported that the browser
+       * refused to start it until the page is interacted with.
+       *
+       * Only the refusal counts. "Wanted but not playing" alone is also true
+       * for the half second after any Play click, before the transport has
+       * caught up — which flashed this hint on every press.
+       */
+      function autoplayBlocked() {
+        const reported = state?.reported;
+        return Boolean(state?.playing && state?.current && reported?.blocked === true && reported.playing === false);
+      }
+
+      /**
+       * Start audio from inside this click.
+       *
+       * The gesture grants sticky user activation to the document that owns the
+       * element — this one for the local transport, the shell document for the
+       * engine, as activation propagates up the same-origin frame tree.
+       * `playNow()` fires the attempt synchronously; the repeats cover the
+       * propagation order and any attempt already in flight.
+       */
+      function resumeWithGesture() {
+        const attempt = () => {
+          try { transport().playNow?.(); } catch { /* ignore */ }
+          pokeEngine();
+        };
+        attempt();
+        setTimeout(attempt, 200);
+        setTimeout(attempt, 800);
+        toast(t('resuming'));
+      }
+
+      // ---------------------------------------------------------------- render
+      function render() {
+        if (!state) return;
+        const track = state.current;
+        const cover = track?.picUrl || '';
+        // Setting the same `src` again restarts the image load.
+        if ($('cover').dataset.src !== cover) {
+          $('cover').dataset.src = cover;
+          $('cover').src = cover;
+        }
+        $('cover').style.visibility = cover ? 'visible' : 'hidden';
+        setText($('np-title'), track ? track.name : t('nothingPlaying'));
+        setText($('np-artists'), track ? (track.artists || []).join(' / ') : '');
+        setText($('np-album'), track ? track.album || '' : '');
+        $('library-cta').hidden = Boolean(track);
+        // Details and lyrics belong to the track, and this page fetches them
+        // itself on every update — not from the local transport's `applySource`,
+        // which only ever runs when this page owns the audio element. In the
+        // normal case the shell engine plays, so that path is dead and the
+        // pane stayed empty forever.
+        syncInfo(track?.id ?? null);
+        loadIntro();
+        prefetchNextDetails();
+        prefetchNextLyrics();
+        setIcon($('play'), state.playing ? 'pause' : 'play', { filled: true });
+        setText($('mode'), { list: t('modeList'), single: t('modeSingle'), shuffle: t('modeShuffle') }[state.mode] || t('modeList'));
+        $('queue-clear').disabled = (state.queue?.length ?? 0) <= (state.current ? 1 : 0);
+        $('dj-toggle').classList.toggle('on', Boolean(state.dj?.enabled));
+        paintHistory();
+        // The mood brief is persisted player setting, not part of the DJ status
+        // block, so it comes from `settings`.
+        if (document.activeElement !== $('dj-prompt')) $('dj-prompt').value = state.settings?.djPrompt ?? '';
+
+        // Account chip
+        const account = state.account;
+        const chip = account
+          ? `${account.avatar ? `<img src="${esc(account.avatar)}" alt="">` : ''}<span>${esc(account.nickname)}${account.vip ? ' · VIP' : ''}</span>`
+          : `<button id="signin">${esc(t('signin'))}</button>`;
+        if (setHtml($('account'), chip)) {
+          const signin = $('signin');
+          if (signin) signin.onclick = openLogin;
+        }
+
+        // DJ status
+        const dj = state.dj || {};
+        setHtml($('dj-status'), dj.enabled || dj.lastPlan
+          ? `<div class="plan">${dj.busy ? esc(t('djPlanning')) : dj.error ? `AI DJ: ${esc(dj.error)}` : ''}${
+              dj.lastPlan
+                ? `<div><b>+${dj.lastPlan.added}</b> ${esc(dj.lastPlan.vibe || '')}</div><div class="muted">${esc((dj.lastPlan.names || []).slice(-3).join(' · '))}</div>`
+                : ''
+            }${dj.modelError && !dj.lastPlan?.route ? `<div class="muted">${esc(t('modelTierUnavailable'))}: ${esc(dj.modelError)}</div>` : ''}${dj.lastPlan?.source === 'heuristic' ? `<div class="muted">${esc(t('heuristics'))}</div>` : ''}</div>`
+          : '');
+
+        if (autoplayBlocked()) {
+          if (!$('gesture')) {
+            const el = document.createElement('div');
+            el.id = 'gesture';
+            el.className = 'need-gesture';
+            el.innerHTML = `${esc(t('gestureText'))} — <button id="gesture-go" class="primary">${esc(t('gesturePlay'))}</button> <span style="color:var(--muted)">${esc(t('gestureNote'))}</span>`;
+            $('notices').append(el);
+            el.querySelector('#gesture-go').onclick = resumeWithGesture;
+          }
+        } else {
+          $('gesture')?.remove();
+        }
+
+        // The engine owns the real volume; mirror it unless the user is
+        // mid-drag, when overwriting the thumb would fight the pointer.
+        if (document.activeElement !== $('volume')) $('volume').value = state.volume;
+        setIcon($('mute'), state.muted || state.volume === 0 ? 'muted' : 'volume');
+
+        // Same for quality: the host is authoritative, the select mirrors it.
+        const preferredLevel = state.audio?.preferred;
+        if (
+          preferredLevel &&
+          document.activeElement !== $('quality') &&
+          qualityLevels.some((entry) => entry.id === preferredLevel)
+        ) {
+          $('quality').value = preferredLevel;
+        }
+        paintQualityInfo();
+
+        renderQueue();
+        paintTaste();
+        paintProgress();
+      }
+
+      /**
+       * Rows the queue list shows at most. The host keeps the full queue (and
+       * the play history backing the stats), but the panel only paints a
+       * sliding window around the cursor so old, already-played tracks drop
+       * out of view instead of piling up.
+       */
+      const MAX_VISIBLE_ROWS = 30;
+
+      function renderQueue() {
+        if (!state) return;
+        const queue = state.queue || [];
+        const total = state.counts ? `(${state.counts.queued})` : '';
+        if (queue.length === 0) {
+          setText($('counts'), total);
+          // Emptying the list dropped its scroll position, so a queue restored
+          // with the same song playing has to be revealed again.
+          if (setHtml($('queue'), `<div class="empty">${esc(t('queueEmpty'))}</div>`)) {
+            revealedRow = null;
+            revealing = null;
+          }
+          return;
+        }
+        // A window of at most MAX_VISIBLE_ROWS rows that always includes the
+        // current track: up to four played rows above it for context, the rest
+        // upcoming. Row numbers stay absolute, so trimmed rows read as a gap
+        // in the numbering, and the counts line names the visible range.
+        const cursor = state.index < 0 ? 0 : state.index;
+        const start = Math.max(0, Math.min(cursor - 4, queue.length - MAX_VISIBLE_ROWS));
+        const end = Math.min(queue.length, start + MAX_VISIBLE_ROWS);
+        setText($('counts'), end - start < queue.length ? `(${start + 1}–${end} / ${queue.length})` : total);
+        setHtml($('queue'), queue
+          .slice(start, end)
+          .map((track, offset) => {
+            const index = start + offset;
+            const playing = index === state.index;
+            return `<div class="row ${playing ? 'playing' : ''}" data-jump="${index}">
+              <span class="idx">${playing ? icon('play', { filled: true, small: true }) : index + 1}</span>
+              <img src="${esc(track.picUrl || '')}" alt="" loading="lazy">
+              <span class="meta"><span class="name">${esc(track.name)}</span><span class="sub">${esc((track.artists || []).join(' / '))}</span></span>
+              ${track.vip ? '<span class="tag">VIP</span>' : ''}
+              <button class="heart ${track.liked ? 'on' : ''}" data-like="${index}" title="${esc(t(track.liked ? 'unlike' : 'like'))}">${icon('heart', { filled: track.liked, small: true })}</button>
+              <span class="dur">${fmt(track.duration)}</span>
+              <span class="acts"><button data-remove="${index}" title="${esc(t('remove'))}">${icon('x', { small: true })}</button></span>
+            </div>`;
+          })
+          .join(''));
+        revealPlayingRow();
+      }
+
+      /** The playing row the queue last scrolled to, as `index:trackId`. */
+      let revealedRow = null;
+
+      /**
+       * A smooth reveal still under way: the list edge the row is headed for
+       * and the scroll position that lands it there.
+       */
+      let revealing = null;
+
+      // A reveal ends when the list comes to rest, or when the user scrolls it
+      // themselves.
+      for (const type of ['scrollend', 'wheel', 'touchstart', 'pointerdown', 'keydown']) {
+        $('queue').addEventListener(type, () => { revealing = null; }, { passive: true });
+      }
+
+      /**
+       * Bring the playing row into the queue's view when a new song starts.
+       *
+       * Only on a change of song: the list is re-rendered on every update, and
+       * scrolling then would yank it back while the user browses what comes
+       * next. Only the list itself scrolls — stacked in a narrow window the list
+       * does not scroll on its own, and moving the whole page for it would lose
+       * whatever the user is reading on the stage. A row already in view stays
+       * put; the first paint jumps, later songs glide.
+       */
+      function revealPlayingRow() {
+        const list = $('queue');
+        const row = list.querySelector('.row.playing');
+        if (!row || list.offsetParent === null) return;
+        const key = `${state.index}:${state.current?.id}`;
+        if (key === revealedRow) {
+          followReveal(list, row);
+          return;
+        }
+        const first = revealedRow === null;
+        revealedRow = key;
+        revealing = null;
+        const view = list.getBoundingClientRect();
+        const box = row.getBoundingClientRect();
+        const edge = box.top < view.top ? 'top' : box.bottom > view.bottom ? 'bottom' : null;
+        if (!edge) return;
+        const top = revealTarget(list, row, edge);
+        if (first || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          list.scrollTo({ top, behavior: 'instant' });
+          return;
+        }
+        revealing = { edge, top };
+        list.scrollTo({ top, behavior: 'smooth' });
+      }
+
+      /**
+       * Keep a glide aimed at the row when a repaint moves it.
+       *
+       * Songs landing in a short queue slide the painted window, and the row
+       * with it, while the list is still scrolling to where the row was. A glide
+       * that has arrived is left alone: from then on a moving row is a change of
+       * queue, not of song.
+       */
+      function followReveal(list, row) {
+        if (!revealing) return;
+        if (Math.abs(list.scrollTop - revealing.top) < 1) {
+          revealing = null;
+          return;
+        }
+        const top = revealTarget(list, row, revealing.edge);
+        if (Math.abs(top - revealing.top) < 1) return;
+        revealing.top = top;
+        list.scrollTo({ top, behavior: 'smooth' });
+      }
+
+      /**
+       * The scroll position that puts the row at one edge of the list, with
+       * half a row of its neighbours showing so it does not land flush against
+       * the card's edge.
+       */
+      function revealTarget(list, row, edge) {
+        const view = list.getBoundingClientRect();
+        const box = row.getBoundingClientRect();
+        const margin = box.height / 2;
+        const top = edge === 'top'
+          ? list.scrollTop + box.top - view.top - margin
+          : list.scrollTop + box.bottom - view.bottom + margin;
+        return Math.max(0, Math.min(top, list.scrollHeight - list.clientHeight));
+      }
+
+      /**
+       * The transport row's taste controls mirror the current track.
+       *
+       * A filled heart is the account's like and a filled ✕ the local dislike,
+       * and a click moves the track to the *other* level — so the label has to
+       * say which direction, which is why the titles are painted here rather
+       * than carried as `data-i18n` on the markup.
+       */
+      function paintTaste() {
+        const track = state?.current;
+        const liked = Boolean(track?.liked);
+        const disliked = Boolean(track?.disliked);
+        setIcon($('like'), 'heart', { filled: liked });
+        $('like').classList.toggle('on', liked);
+        $('like').title = t(liked ? 'unlike' : 'like');
+        $('dislike').classList.toggle('on', disliked);
+        $('dislike').title = t(disliked ? 'undislike' : 'dislike');
+        // A filled arrow is the boost in force; clicking it clears the boost.
+        const boost = track?.boost ?? null;
+        $('boost-more').classList.toggle('on', boost === 'more');
+        $('boost-more').title = t(boost === 'more' ? 'boostClear' : 'boostMore');
+        $('boost-less').classList.toggle('on', boost === 'less');
+        $('boost-less').title = t(boost === 'less' ? 'boostClear' : 'boostLess');
+        paintBoosts();
+      }
+
+      /**
+       * The boosts in force, each with its time left and a ✕ to end it early —
+       * so a temporary push is never invisible, and never outlives the mood.
+       */
+      function paintBoosts() {
+        const boosts = state?.boosts ?? [];
+        const now = Date.now();
+        setHtml($('boosts'), boosts.length
+          ? `<span>${esc(t('boostsTitle'))}:</span>` +
+            boosts
+              .map((boost) => {
+                const minutes = Math.max(Math.round((boost.until - now) / 60_000), 1);
+                return `<span class="boost">${icon(boost.direction === 'more' ? 'more' : 'less', { small: true })} ${esc(boost.name)} · ${esc(t('boostMinutes', { n: minutes }))}<button data-unboost="${boost.id}" title="${esc(t('boostClear'))}">${icon('x', { small: true })}</button></span>`;
+              })
+              .join('')
+          : '');
+      }
+
+      /** Boost a track, or clear its boost with `none`, and adopt the host's answer. */
+      async function sendBoost(trackId, direction, button) {
+        if (button) button.disabled = true;
+        try {
+          state = newest(await api('/boost', { method: 'POST', body: { trackId, direction } }));
+          render();
+          applyTransport();
+          toast(t(direction === 'more' ? 'boostedMore' : direction === 'less' ? 'boostedLess' : 'boostCleared'));
+        } catch (error) {
+          toast(failureText(error));
+        } finally {
+          if (button) button.disabled = false;
+        }
+      }
+
+      /**
+       * Take one track out of the queue.
+       *
+       * This is the queue endpoint, not `/taste`: the host drops the row and, in
+       * the same request, reads the removal as a dislike of a track that carries
+       * no level yet — so the row does not come straight back from the DJ's next
+       * batch. `/taste` alone only writes the level, which leaves the row in the
+       * list, and its NetEase half can be refused, which must never keep a row
+       * the click asked to remove.
+       *
+       * @returns {Promise<boolean>} whether the row really left the queue, so the
+       *   caller's confirm describes the removal the click asked for and not the
+       *   judgement the host makes of it.
+       */
+      async function removeFromList(index, button) {
+        const track = state?.queue?.[index];
+        if (!track) return false;
+        // The trip to NetEase is not instant on a cold cache, so a second click
+        // mid-flight is locked out, exactly as the transport switchers do.
+        if (button) button.disabled = true;
+        try {
+          state = newest(await api('/queue', { method: 'POST', body: { action: 'remove', index } }));
+          // Read the answer off the new queue: an index that named a row someone
+          // else had already dropped must not claim a removal that did not happen.
+          return !(state.queue || []).some((entry) => entry.id === track.id);
+        } finally {
+          // `render()` replaces the row markup, so this node may be detached —
+          // harmless, and it keeps a button the host refused usable.
+          if (button) button.disabled = false;
+        }
+      }
+
+      /**
+       * Move one track to a taste level on the host and adopt its answer.
+       *
+       * `liked` and `none` change the NetEase account and need a session, which
+       * the host reports as `code: ANONYMOUS`; `disliked` is local, so it always
+       * applies. Returns whether the level really moved, so a caller's toast
+       * cannot claim a like NetEase refused.
+       */
+      async function sendTaste(track, level, button) {
+        // The trip to NetEase is not instant on a cold cache. This guards
+        // against a second click mid-flight; the row still updates at the end,
+        // in the same frame as the toast, so the lag is honest rather than
+        // promised.
+        if (button) button.disabled = true;
+        try {
+          state = newest(await api('/taste', { method: 'POST', body: { trackId: track.id, level } }));
+          render();
+          applyTransport();
+          return true;
+        } catch (error) {
+          toast(failureText(error));
+          return false;
+        } finally {
+          // `render()` replaces the row markup, so this node may be detached —
+          // harmless, and it keeps the transport buttons (which are not) usable.
+          if (button) button.disabled = false;
+        }
+      }
+
+      function paintProgress() {
+        if (!state || !state.current) return;
+        const position = positionMs();
+        const duration = durationMs();
+        if (document.activeElement !== $('seek')) {
+          $('seek').value = duration > 0 ? String(Math.round((position / duration) * 1000)) : '0';
+        }
+        setText($('t-cur'), fmt(position));
+        setText($('t-dur'), fmt(duration));
+      }
+
+      // ------------------------------------------------------ details + lyrics
+      /** The pane shown, remembered across reloads when storage is open; details by default. */
+      function readInfoViewPref() {
+        try { return localStorage.getItem(INFO_VIEW_PREF) === 'lyrics' ? 'lyrics' : 'details'; } catch { return 'details'; }
+      }
+
+      function saveInfoViewPref(view) {
+        try { localStorage.setItem(INFO_VIEW_PREF, view); } catch { /* storage denied */ }
+      }
+
+      /** Reflect `infoView` in the tabs and the panes. */
+      function paintInfoTabs() {
+        for (const view of ['details', 'lyrics']) {
+          const on = infoView === view;
+          $('tab-' + view).classList.toggle('on', on);
+          $('tab-' + view).setAttribute('aria-selected', on ? 'true' : 'false');
+          $(view).hidden = !on;
+        }
+      }
+
+      /**
+       * Bring the visible pane up to the track. Only the visible one: a hidden
+       * pane is neither fetched nor painted, and catches up when it is shown.
+       */
+      function syncInfo(trackId) {
+        if (infoView === 'details') {
+          if (trackId === detailsTrackId) return;
+          detailsTrackId = trackId;
+          if (trackId) loadDetails(trackId);
+          else $('details').innerHTML = '<p class="hint">—</p>';
+          return;
+        }
+        if (trackId === lyricTrackId) return;
+        lyricTrackId = trackId;
+        if (trackId) loadLyrics(trackId);
+        else {
+          lyric = null;
+          lyricLine = -1;
+          $('lyrics').innerHTML = '<p class="hint">—</p>';
+        }
+      }
+
+      function showInfo(view) {
+        if (view === infoView) return;
+        infoView = view;
+        saveInfoViewPref(view);
+        paintInfoTabs();
+        syncInfo(state?.current?.id ?? null);
+        // A hidden pane kept no scroll position, so showing the lyrics puts the
+        // current line back in view instead of waiting for the next line.
+        if (view === 'lyrics') {
+          lyricLine = -1;
+          paintLyrics();
+        }
+      }
+
+      $('tab-details').onclick = () => showInfo('details');
+      $('tab-lyrics').onclick = () => showInfo('lyrics');
+      paintInfoTabs();
+
+      // The introduction's switch, or the written one itself, swaps it with
+      // NetEase's prose; clamped prose opens in place.
+      $('details').onclick = (event) => {
+        const source = event.target.closest?.('[data-source]')?.dataset.source ?? (event.target.closest?.('.written') ? 'netease' : null);
+        if (source) {
+          introSource = source;
+          repaintDetails({ keepScroll: true });
+          return;
+        }
+        const prose = event.target.closest?.('.about .prose');
+        if (prose) prose.classList.toggle('open');
+      };
+
+      /** One track's details, fetched once however many ask, and kept. */
+      function fetchDetails(id) {
+        if (!detailsLoads.has(id)) {
+          const load = api('/info/' + id)
+            .then((info) => {
+              detailsCache.set(id, info);
+              if (detailsCache.size > 30) detailsCache.delete(detailsCache.keys().next().value);
+              return info;
+            })
+            .finally(() => detailsLoads.delete(id));
+          detailsLoads.set(id, load);
+        }
+        return detailsLoads.get(id);
+      }
+
+      /**
+       * The track that plays after this one, wrapping past the end as list
+       * playback does. Shuffle has no known next track, and repeat-one's next
+       * is this one, so both answer null.
+       */
+      function nextTrack() {
+        if (!state?.current || state.mode !== 'list') return null;
+        const next = state.queue?.[(state.index + 1) % state.queue.length];
+        return next?.id !== state.current.id ? next : null;
+      }
+
+      /**
+       * Fetch the next track's details ahead, so they show the moment it
+       * starts. Lazy like the introduction: only after the shown track's
+       * details have painted, and only while the details are shown.
+       */
+      function prefetchNextDetails() {
+        if (infoView !== 'details' || !detailsTrackId || !detailsCache.has(detailsTrackId)) return;
+        const next = nextTrack();
+        if (!next?.id) return;
+        if (detailsCache.has(next.id)) {
+          prefetchNextIntro();
+          return;
+        }
+        if (detailsLoads.has(next.id)) return;
+        fetchDetails(next.id).then(prefetchNextIntro).catch(() => { /* the track's own load retries */ });
+      }
+
+      /**
+       * Write the next track's introduction ahead. Each one is a model call,
+       * so it waits until this track is past the skip window, when the next
+       * is likely to be heard. At the end of the queue the DJ tops up before
+       * playback wraps, so the first track is not written for while it is on.
+       */
+      function prefetchNextIntro() {
+        if (infoView !== 'details' || !state?.playing || detailsTrackId !== state.current?.id) return;
+        // Match the host's skip window: 30 seconds, or a quarter of a longer track.
+        if (positionMs() < Math.max(30_000, durationMs() * 0.25)) return;
+        if (state.dj?.enabled && state.index + 1 >= state.queue.length) return;
+        const next = nextTrack();
+        if (next?.id && detailsCache.has(next.id)) void fetchIntro(next.id, LANG);
+      }
+
+      /** One track's lyrics, fetched once however many ask, and kept. */
+      function fetchLyrics(id) {
+        if (!lyricLoads.has(id)) {
+          const load = api('/lyric/' + id)
+            .then((data) => {
+              lyricCache.set(id, data);
+              if (lyricCache.size > 30) lyricCache.delete(lyricCache.keys().next().value);
+              return data;
+            })
+            .finally(() => lyricLoads.delete(id));
+          lyricLoads.set(id, load);
+        }
+        return lyricLoads.get(id);
+      }
+
+      /** Fetch the next track's lyrics ahead, once the shown ones have painted and while the lyrics are shown. */
+      function prefetchNextLyrics() {
+        if (infoView !== 'lyrics' || lyricTrackId !== state?.current?.id || !lyricCache.has(lyricTrackId)) return;
+        const next = nextTrack();
+        if (!next?.id || lyricCache.has(next.id) || lyricLoads.has(next.id)) return;
+        fetchLyrics(next.id).catch(() => { /* the track's own load retries */ });
+      }
+
+      async function loadDetails(id) {
+        const request = ++detailsRequest;
+        introSource = 'ai';
+        const cached = detailsCache.get(id);
+        if (cached) {
+          paintDetails(cached);
+          setTimeout(afterDetails);
+          return;
+        }
+        $('details').innerHTML = `<p class="hint">${esc(t('loading'))}</p>`;
+        try {
+          const info = await fetchDetails(id);
+          if (request !== detailsRequest) return;
+          paintDetails(info);
+          setTimeout(afterDetails);
+        } catch (error) {
+          if (request !== detailsRequest) return;
+          $('details').innerHTML = `<p class="hint">${esc(error.message)}</p>`;
+        }
+      }
+
+      /**
+       * What waits for the details to paint: the introduction and the next
+       * track's details. Its own turn, so neither is asked for before the
+       * facts are on screen, and not tied to the next update from the host,
+       * which may be minutes away now that it only comes on a change.
+       */
+      function afterDetails() {
+        loadIntro();
+        prefetchNextDetails();
+      }
+
+      /** Paint the shown track's details again: a language switch, an introduction, the switch. */
+      function repaintDetails(options) {
+        const info = detailsCache.get(detailsTrackId);
+        if (info) paintDetails(info, options);
+      }
+
+      /**
+       * Ask for the shown track's introduction, once its details are painted.
+       *
+       * Lazy on purpose: a model call takes seconds, so it waits until the
+       * details have painted — playback and the NetEase facts never wait on
+       * it. Prefetching the next introduction uses the same cache.
+       */
+      function loadIntro() {
+        if (infoView !== 'details' || !detailsTrackId || !detailsCache.has(detailsTrackId)) return;
+        const cached = intros.get(`${detailsTrackId}:${LANG}`);
+        if (typeof cached === 'object') introsUnavailable = !cached.text;
+        void fetchIntro(detailsTrackId, LANG);
+      }
+
+      async function fetchIntro(id, lang) {
+        const key = `${id}:${lang}`;
+        if (intros.has(key)) return;
+        intros.set(key, 'pending');
+        if (intros.size > 60) intros.delete(intros.keys().next().value);
+        let text = '';
+        try {
+          const answer = await api(`/intro/${id}?lang=${lang}`);
+          text = typeof answer?.text === 'string' ? answer.text : '';
+        } catch { /* NetEase's prose stands in */ }
+        intros.set(key, { text });
+        if (infoView === 'details' && detailsTrackId === id && LANG === lang) {
+          introsUnavailable = !text;
+          repaintDetails({ keepScroll: true });
+        }
+      }
+
+      /** NetEase dates are midnight in China; read them there, as YYYY-MM-DD. */
+      function chinaDate(ms) {
+        try {
+          return new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
+        } catch {
+          return new Date(ms).toISOString().slice(0, 10);
+        }
+      }
+
+      function paintDetails(info, { keepScroll = false } = {}) {
+        const facts = [];
+        const fact = (label, html) => facts.push(`<dt>${esc(t(label))}</dt><dd>${html}</dd>`);
+        const chips = (list, kind = '') =>
+          `<span class="chips">${list.map((item) => `<span class="chip ${kind}">${esc(item)}</span>`).join('')}</span>`;
+
+        const album = info.album ?? {};
+        if (album.name) {
+          const notes = [
+            album.subType || album.type,
+            album.publishTime ? chinaDate(album.publishTime) : '',
+            album.company,
+            album.size > 1 ? t('albumTracks', { n: album.size }) : '',
+          ].filter(Boolean);
+          fact('album', esc(album.name) + (notes.length ? ` <span class="muted">· ${esc(notes.join(' · '))}</span>` : ''));
+        }
+        // A genre is a path such as 流行-华语流行; its leaf names it.
+        if (info.genres?.length) fact('genre', chips(info.genres.map((genre) => genre.split('-').pop()), 'genre'));
+        if (info.tags?.length) fact('tags', chips(info.tags));
+        const spoken = [info.language, info.bpm ? `${info.bpm} BPM` : ''].filter(Boolean);
+        if (spoken.length) fact('language', esc(spoken.join(' · ')));
+        if (info.featuredIn?.length) fact('featuredIn', esc(info.featuredIn.join('；')));
+        if (info.awards?.length) fact('awards', esc(info.awards.join('；')));
+
+        const netease = [];
+        // NetEase separates paragraphs with a line break, often indented with
+        // full-width spaces; each becomes its own paragraph, spaced apart.
+        const paragraphs = (text) =>
+          String(text)
+            .split(/\n+/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => `<p>${esc(line)}</p>`)
+            .join('');
+        const section = (title, text, by = '') =>
+          netease.push(
+            `<section class="about"><h4>${esc(title)}</h4><div class="prose" title="${esc(t('expand'))}">${paragraphs(text)}</div>` +
+              (by ? `<div class="by">${esc(by)}</div>` : '') +
+              '</section>',
+          );
+        if (info.review?.text) section(t('aboutSong'), info.review.text, info.review.by ? t('reviewBy', { name: info.review.by }) : '');
+        for (const artist of info.artists ?? []) if (artist.intro) section(artist.name, artist.intro);
+        if (album.intro) section(t('aboutAlbum'), album.intro);
+
+        // The model's introduction leads; NetEase's prose is a click away. While
+        // it is written, NetEase's prose shows if the model was last unavailable.
+        const intro = intros.get(`${info.id}:${LANG}`);
+        const written = typeof intro === 'object' && intro.text ? intro.text : '';
+        const waiting = intro === undefined || intro === 'pending';
+        const head = `<h4>${esc(t('intro'))}<span class="badge">AI</span></h4>`;
+        const swap = (to, label) => `<button class="link source" type="button" data-source="${to}">${esc(t(label))}</button>`;
+        let about;
+        if (introSource === 'ai' && written) {
+          about =
+            `<section class="about">${head}<div class="written" title="${esc(t('introToNetease'))}">${paragraphs(written)}</div></section>` +
+            (netease.length ? swap('netease', 'introFromNetease') : '');
+        } else if (introSource === 'ai' && waiting && !introsUnavailable) {
+          about =
+            `<section class="about">${head}<p class="writing">${esc(t('introWriting'))}</p></section>` +
+            (netease.length ? swap('netease', 'introFromNetease') : '');
+        } else {
+          about = (written ? swap('ai', 'introFromAi') : '') + netease.join('');
+        }
+
+        const alias = info.alias?.length ? `<p class="alias">${esc(info.alias.join(' / '))}</p>` : '';
+        const scrolled = $('details').scrollTop;
+        $('details').innerHTML =
+          facts.length || about || alias
+            ? alias + (facts.length ? `<dl class="facts">${facts.join('')}</dl>` : '') + about
+            : `<p class="hint">${esc(t('noDetails'))}</p>`;
+        $('details').scrollTop = keepScroll ? scrolled : 0;
+      }
+
+      async function loadLyrics(id) {
+        const request = ++lyricRequest;
+        lyric = null;
+        lyricLine = -1;
+        if (lyricCache.has(id)) {
+          paintLyricData(lyricCache.get(id));
+          setTimeout(prefetchNextLyrics);
+          return;
+        }
+        $('lyrics').innerHTML = `<p class="hint">${esc(t('loading'))}</p>`;
+        try {
+          const data = await fetchLyrics(id);
+          // Skipping tracks faster than NetEase answers would otherwise let an
+          // earlier reply land on the newer track's pane.
+          if (request !== lyricRequest || lyricTrackId !== id) return;
+          paintLyricData(data);
+          setTimeout(prefetchNextLyrics);
+        } catch (error) {
+          if (request !== lyricRequest || lyricTrackId !== id) return;
+          $('lyrics').innerHTML = `<p class="hint">${esc(error.message)}</p>`;
+        }
+      }
+
+      function paintLyricData(data) {
+        if (data.noLyric || !data.lrc) {
+          $('lyrics').innerHTML = `<p class="hint">${esc(t('instrumental'))}</p>`;
+          return;
+        }
+        const lines = [];
+        for (const raw of data.lrc.split('\n')) {
+          const matches = [...raw.matchAll(/\[(\d+):(\d+(?:[.:]\d+)?)\]/g)];
+          const text = raw.replace(/\[[^\]]*\]/g, '').trim();
+          if (matches.length === 0) continue;
+          for (const match of matches) {
+            const seconds = Number(match[1]) * 60 + Number(String(match[2]).replace(':', '.'));
+            lines.push({ at: seconds * 1000, text });
+          }
+        }
+        lines.sort((a, b) => a.at - b.at);
+        lyric = lines;
+        $('lyrics').innerHTML = lines.map((line, index) => `<p data-line="${index}">${esc(line.text || '♪')}</p>`).join('');
+      }
+
+      function paintLyrics() {
+        if (!lyric || infoView !== 'lyrics') return;
+        const at = positionMs();
+        let active = -1;
+        for (let index = 0; index < lyric.length; index++) {
+          if (lyric[index].at <= at) active = index; else break;
+        }
+        // `timeupdate` fires ~4x/s; only touch the DOM and scroll when the
+        // highlighted line actually changes, or smooth scrolling thrashes.
+        if (active === lyricLine) return;
+        lyricLine = active;
+        for (const el of $('lyrics').querySelectorAll('p')) el.classList.toggle('on', Number(el.dataset.line) === active);
+        const current = $('lyrics').querySelector('p.on');
+        if (current) current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+
+      // -------------------------------------------------------------- QR login
+      function drawQr(text) {
+        const canvas = $('qr');
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        if (typeof qrcode !== 'function') {
+          context.fillStyle = '#000';
+          context.font = '12px sans-serif';
+          context.fillText('QR library unavailable', 12, 24);
+          return;
+        }
+        const qr = qrcode(0, 'M');
+        qr.addData(text);
+        qr.make();
+        const count = qr.getModuleCount();
+        const quiet = 2;
+        const size = Math.floor(canvas.width / (count + quiet * 2));
+        const offset = Math.floor((canvas.width - size * count) / 2);
+        context.fillStyle = '#000';
+        for (let row = 0; row < count; row++) {
+          for (let col = 0; col < count; col++) {
+            if (qr.isDark(row, col)) context.fillRect(offset + col * size, offset + row * size, size, size);
+          }
+        }
+      }
+
+      /**
+       * The QR state line. The host's `state` field is stable vocabulary, so
+       * it localizes here; free-form host messages (agent-facing, bilingual)
+       * are the fallback for anything unknown, and a poll failure carries the
+       * raw error in `error`.
+       */
+      function loginMessage(data) {
+        if (data.error) return t('pollFailed') + data.error;
+        const key = {
+          waiting: 'loginWaiting',
+          scanned: 'loginScanned',
+          expired: 'loginExpired',
+          success: 'loginSuccess',
+          idle: 'loginIdle',
+        }[data.state];
+        return key ? t(key) : data.message || data.state;
+      }
+
+      let qrTimer;
+      async function openLogin() {
+        const dialog = $('login');
+        dialog.showModal();
+        $('qr-state').textContent = t('qrFetching');
+        try {
+          const data = await api('/login/qr', { method: 'POST', body: {} });
+          drawQr(data.loginUrl);
+          $('qr-state').textContent = t('qrScan');
+        } catch (error) {
+          $('qr-state').textContent = error.message;
+        }
+        clearInterval(qrTimer);
+        qrTimer = setInterval(pollLogin, 2000);
+      }
+
+      async function pollLogin() {
+        try {
+          const data = await api('/login/poll', { method: 'POST', body: {} });
+          if (data.state === 'success') {
+            clearInterval(qrTimer);
+            $('login').close();
+            toast(t('loginSuccess'));
+            await refresh();
+            // Signing in with nothing playing used to leave a dead player
+            // screen: the playlists are the one useful next step. Never yank
+            // the view when something is already playing.
+            if (!state?.current) window.location.href = `${BASE}/library`;
+            return;
+          }
+          if (data.loginUrl) drawQr(data.loginUrl);
+          $('qr-state').textContent = loginMessage(data);
+        } catch (error) {
+          $('qr-state').textContent = error.message;
+        }
+      }
+
+      $('qr-refresh').onclick = openLogin;
+      $('qr-close').onclick = () => { clearInterval(qrTimer); $('login').close(); };
+      $('login').addEventListener('close', () => clearInterval(qrTimer));
+
+      // ---------------------------------------------------------- DJ model
+      /**
+       * The DJ model picker.
+       *
+       * Routes and their catalogued models come from the host's LLM service.
+       * The catalogue is advisory — core resolution accepts unlisted ids — so
+       * the "Other…" entry reveals a text field for any id the route serves. A
+       * saved choice persists in the session document and takes precedence over
+       * the profile patch, which the "Revert" button falls back to.
+       */
+      let modelRoutes = [];
+      let modelSelected = { provider: null, model: null };
+      let modelConfigured = { provider: null, model: null };
+      /** Raw source key from the host; localized on every paint. */
+      let modelSourceRaw = '';
+      const CUSTOM = '__custom__';
+      const MODEL_CONTROLS = [
+        'dj-provider',
+        'dj-model-select',
+        'dj-model-custom',
+        'dj-model-save',
+        'dj-model-test',
+        'dj-model-clear',
+      ];
+
+      /** Enable or disable every picker control at once. */
+      function setModelControls(enabled) {
+        for (const id of MODEL_CONTROLS) {
+          const node = $(id);
+          if (node) node.disabled = !enabled;
+        }
+      }
+
+      /** Unfolded preference, remembered across reloads when storage is open. */
+      function readDjModelPref() {
+        try { return localStorage.getItem(DJ_MODEL_PREF) === '1'; } catch { return false; }
+      }
+
+      function saveDjModelPref(expanded) {
+        try { localStorage.setItem(DJ_MODEL_PREF, expanded ? '1' : '0'); } catch { /* storage denied */ }
+      }
+
+      /** Reflect `djModelExpanded` in the card and in its chevron. */
+      function paintDjModelToggle() {
+        $('dj-model-body').classList.toggle('collapsed', !djModelExpanded);
+        const button = $('dj-model-toggle');
+        button.textContent = djModelExpanded ? '▾' : '▸';
+        button.title = t(djModelExpanded ? 'djModelToggleHide' : 'djModelToggleShow');
+        button.setAttribute('aria-expanded', djModelExpanded ? 'true' : 'false');
+      }
+
+      /**
+       * The folded card's one line: the effective route and, after it, where
+       * that choice came from. The route leads because it is the answer to the
+       * question the folded card raises — "which model is the DJ using?".
+       */
+      function paintDjModelHeader() {
+        const { provider, model } = modelSelected ?? {};
+        $('dj-model-route').textContent = provider ? (model ? `${provider}/${model}` : provider) : '';
+        paintModelSource();
+      }
+
+      /**
+       * The form's status line, mirrored as a marker on the header.
+       *
+       * A route error or a host that predates this feature would otherwise be
+       * invisible while the form is folded, which is exactly when the picker
+       * looks like it is simply missing.
+       */
+      function paintModelStatus(text) {
+        const message = text ?? '';
+        $('dj-model-status').textContent = message;
+        const warn = $('dj-model-warn');
+        warn.textContent = message ? ' ⚠' : '';
+        warn.title = message;
+      }
+
+      // The header is the click target and the chevron sits inside it, so a
+      // click on the button bubbles here once rather than toggling twice.
+      $('dj-model-head').onclick = () => {
+        djModelExpanded = !djModelExpanded;
+        saveDjModelPref(djModelExpanded);
+        paintDjModelToggle();
+      };
+      paintDjModelToggle();
+
+      function renderModelOptions() {
+        const provider = $('dj-provider').value;
+        const route = modelRoutes.find((entry) => entry.provider === provider);
+        const models = route?.models ?? [];
+        const select = $('dj-model-select');
+        select.innerHTML =
+          models.map((model) => `<option value="${esc(model.id)}">${esc(model.name || model.id)}</option>`).join('') +
+          `<option value="${CUSTOM}">${esc(t('other'))}</option>`;
+
+        const pinned = modelSelected.provider === provider ? modelSelected.model : null;
+        const custom = $('dj-model-custom');
+        if (pinned && models.some((model) => model.id === pinned)) {
+          select.value = pinned;
+          custom.style.display = 'none';
+        } else if (pinned) {
+          // Pinned to an id outside the catalogue; keep it rather than lose it.
+          select.value = CUSTOM;
+          custom.style.display = '';
+          custom.value = pinned;
+        } else {
+          custom.style.display = 'none';
+        }
+        if (route?.error) paintModelStatus(route.error);
+      }
+
+      /**
+       * Where the effective model choice comes from, localized.
+       *
+       * It trails the route on the folded card, so the separator belongs to it:
+       * with no route to trail, a leading "·" would dangle.
+       */
+      function paintModelSource() {
+        const key = {
+          panel: 'srcPanel',
+          config: 'srcConfig',
+          'agent-default': 'srcAgentDefault',
+          discovered: 'srcDiscovered',
+        }[modelSourceRaw];
+        const label = key ? t(key) : modelSourceRaw || '';
+        const route = $('dj-model-route').textContent;
+        $('dj-model-source').textContent = label && route ? ` · ${label}` : label;
+      }
+
+      async function loadModelPicker() {
+        try {
+          const data = await api('/dj/models');
+          setModelControls(true);
+          modelRoutes = data.routes ?? [];
+          modelSelected = data.selected ?? { provider: null, model: null };
+          modelConfigured = data.configured ?? { provider: null, model: null };
+
+          const providers = modelRoutes.map((route) => route.provider);
+          // Keep a value the catalogue does not list, so a working pin is not
+          // silently replaced by whatever the adapter happens to offer.
+          for (const value of [modelSelected.provider, modelConfigured.provider]) {
+            if (value && !providers.includes(value)) providers.push(value);
+          }
+          const select = $('dj-provider');
+          select.innerHTML = providers.length
+            ? providers.map((provider) => `<option value="${esc(provider)}">${esc(provider)}</option>`).join('')
+            : `<option value="">${esc(t('noProvider'))}</option>`;
+          select.value = modelSelected.provider ?? modelConfigured.provider ?? providers[0] ?? '';
+
+          // Painted before the options are rendered: that call is what reports a
+          // provider's own catalogue failure, and it must land last so the
+          // folded card's marker cannot be wiped by the (usually empty)
+          // host-level error.
+          modelSourceRaw = data.source ?? '';
+          paintDjModelHeader();
+          paintModelStatus(data.error ?? '');
+          renderModelOptions();
+        } catch (error) {
+          // A 404 here means this page is newer than the host module: the page
+          // is re-read from disk on every plugin mount, while Node keeps
+          // serving the cached module. Only a process restart reunites them, so
+          // say that instead of showing a bare "unknown endpoint".
+          if (/unknown endpoint|\b404\b/.test(error.message)) {
+            setModelControls(false);
+            paintModelStatus(t('hostPredatesLong'));
+          } else {
+            paintModelStatus(error.message);
+          }
+        }
+      }
+
+      /** The model the form currently points at. */
+      function chosenModel() {
+        return $('dj-model-select').value === CUSTOM
+          ? $('dj-model-custom').value.trim()
+          : $('dj-model-select').value;
+      }
+
+      async function saveModelRoute(provider, model, message) {
+        try {
+          state = newest(await api('/dj', { method: 'POST', body: { provider, model } }));
+          render();
+          await loadModelPicker();
+          toast(message);
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+
+      $('dj-provider').onchange = renderModelOptions;
+      $('dj-model-select').onchange = () => {
+        $('dj-model-custom').style.display = $('dj-model-select').value === CUSTOM ? '' : 'none';
+      };
+      $('dj-model-save').onclick = () => {
+        const provider = $('dj-provider').value;
+        const model = chosenModel();
+        if (!provider || !model) {
+          toast(t('pickProviderModel'));
+          return;
+        }
+        void saveModelRoute(provider, model, t('saved', { route: `${provider}/${model}` }));
+      };
+      $('dj-model-clear').onclick = () =>
+        void saveModelRoute('', '', t('reverted'));
+      $('dj-model-test').onclick = async () => {
+        paintModelStatus(t('testing'));
+        try {
+          const result = await api('/dj/test', { method: 'POST', body: {} });
+          if (result.source === 'model') {
+            paintModelStatus(
+              `✓ ${result.route} — ${(result.picked ?? []).join(' · ')}${result.vibe ? ` (${result.vibe})` : ''}`);
+          } else {
+            paintModelStatus(`✗ ${result.modelError ?? result.note ?? t('modelTierUnavailable')} — ${t('heuristics')}`);
+          }
+        } catch (error) {
+          paintModelStatus(error.message);
+        }
+      };
+
+      // ------------------------------------------------------ streaming quality
+      /**
+       * The quality picker.
+       *
+       * NetEase refuses a level per track and per entitlement, and the host
+       * walks down a ladder when it does, so the caption reports what was
+       * *actually* served — including when that is lower than what was asked
+       * for. A richer level means a much larger file: Hi-Res ran 51–63 MB per
+       * track against 320 kbps MP3 at ~10 MB.
+       */
+      let qualityLevels = [];
+
+      /**
+       * One level's display name. The dictionary knows the shipped levels;
+       * anything else falls back to the host's own (bilingual) label.
+       */
+      function qualityLabel(entry) {
+        return DICT[LANG]?.['quality.' + entry.id] ?? DICT.en['quality.' + entry.id] ?? entry.label ?? entry.id;
+      }
+
+      /** Rebuild the picker options, preserving the current selection. */
+      function paintQualityOptions() {
+        if (qualityLevels.length === 0) return;
+        const current = $('quality').value;
+        $('quality').innerHTML = qualityLevels
+          .map((entry) => `<option value="${esc(entry.id)}">${esc(qualityLabel(entry))}</option>`)
+          .join('');
+        if (qualityLevels.some((entry) => entry.id === current)) $('quality').value = current;
+      }
+
+      /** Caption for what the last stream actually served. */
+      function paintQualityInfo() {
+        const last = state?.audio?.last;
+        const preferred = state?.audio?.preferred;
+        if (!last || (preferred && last.requested !== preferred && last.trackId !== state?.current?.id)) {
+          setText($('quality-info'), '');
+          return;
+        }
+        const kbps = last.br ? ` · ${Math.round(last.br / 1000)} kbps` : '';
+        setText($('quality-info'),
+          `▶ ${String(last.type ?? '').toUpperCase()}${kbps}` + (last.downgraded ? ` (${last.served}, ${t('downgraded')})` : ''));
+      }
+
+      async function loadQuality() {
+        try {
+          const data = await api('/quality');
+          qualityLevels = data.levels ?? [];
+          paintQualityOptions();
+          $('quality').value = data.preferred ?? 'exhigh';
+          paintQualityInfo();
+        } catch (error) {
+          // A host without this endpoint is older than this page; say so once.
+          $('quality-info').textContent = /unknown endpoint|\b404\b/.test(error.message)
+            ? t('hostPredatesShort')
+            : error.message;
+        }
+      }
+
+      $('quality').onchange = async (event) => {
+        try {
+          state = newest(await api('/quality', { method: 'POST', body: { level: event.target.value } }));
+          render();
+          applyTransport();
+          pokeEngine();
+          paintQualityInfo();
+          toast(t('qualitySet', { level: event.target.value }));
+        } catch (error) {
+          toast(error.message);
+        }
+      };
+
+      // ------------------------------------------------------------------ wiring
+      $('play').onclick = () => control({ action: 'toggle' });
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== ' ' || event.defaultPrevented || event.isComposing ||
+            event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        const focused = document.activeElement;
+        if (focused?.isContentEditable || focused?.matches?.('input, textarea, select, button, [role="textbox"]')) return;
+        event.preventDefault();
+        if (!event.repeat) void control({ action: 'toggle' });
+      });
+      $('next').onclick = () => control({ action: 'next' });
+      $('prev').onclick = () => control({ action: 'previous' });
+      $('mode').onclick = () => control({ action: 'mode', value: { list: 'shuffle', shuffle: 'single', single: 'list' }[state?.mode || 'list'] });
+      $('mute').onclick = () => control({ action: 'mute', value: !state?.muted });
+      $('volume').oninput = (event) => {
+        const value = Number(event.target.value);
+        // The engine owns the real gain; mirror it locally and throttle the
+        // round-trip while the pointer is still down.
+        if (state) state.volume = value;
+        setIcon($('mute'), value === 0 ? 'muted' : 'volume');
+        if (Date.now() - volumePostAt > 150) {
+          volumePostAt = Date.now();
+          control({ action: 'volume', value });
+        }
+      };
+      $('volume').onchange = (event) => control({ action: 'volume', value: Number(event.target.value) });
+      // Sent at once: the transport silences on the first seek and debounces
+      // the resume, so delaying here would only let the old position play on.
+      $('seek').onchange = (event) => {
+        control({ action: 'seek', value: Math.round((Number(event.target.value) / 1000) * durationMs()) });
+      };
+      // Both taste buttons are switchers: the filled state is the one that
+      // removes, so the click asks the host for the level it moves to.
+      $('like').onclick = async (event) => {
+        const track = state?.current;
+        if (!track) return;
+        if (await sendTaste(track, track.liked ? 'none' : 'liked', event?.currentTarget)) {
+          toast(t(track.liked ? 'unliked' : 'liked'));
+        }
+      };
+      $('dislike').onclick = async (event) => {
+        const track = state?.current;
+        if (!track) return;
+        if (track.disliked) {
+          await sendTaste(track, 'none', event?.currentTarget);
+          return;
+        }
+        // The host takes a disliked track out of the queue, and moves on when it
+        // was playing; pressing next here as well would skip a second track.
+        if (await sendTaste(track, 'disliked', event?.currentTarget)) toast(t('disliked'));
+      };
+
+      // Both boost buttons are switchers too: the filled one clears its boost.
+      for (const direction of ['more', 'less']) {
+        $(`boost-${direction}`).onclick = (event) => {
+          const track = state?.current;
+          if (!track) return;
+          return sendBoost(track.id, track.boost === direction ? 'none' : direction, event?.currentTarget);
+        };
+      }
+      $('boosts').onclick = (event) => {
+        const target = event.target?.closest?.('[data-unboost]');
+        if (target) return sendBoost(Number(target.dataset.unboost), 'none', target);
+      };
+
+      $('scrobble-toggle').onclick = async (event) => {
+        const next = !state?.scrobble?.enabled;
+        const button = event?.currentTarget;
+        if (button) button.disabled = true;
+        try {
+          state = newest(await api('/scrobble', { method: 'POST', body: { enabled: next } }));
+          render();
+          toast(t(next ? 'scrobbleOn' : 'scrobbleOff'));
+        } catch (error) {
+          toast(failureText(error));
+        } finally {
+          if (button) button.disabled = false;
+        }
+      };
+
+      $('dj-toggle').onclick = async () => {
+        try {
+          const data = await api('/dj', { method: 'POST', body: { enabled: !state?.dj?.enabled, prompt: $('dj-prompt').value } });
+          state = newest(data);
+          render();
+          toast(state.dj?.enabled ? t('djOn') : t('djOff'));
+        } catch (error) { toast(error.message); }
+      };
+      $('dj-prompt').onchange = () => api('/dj', { method: 'POST', body: { prompt: $('dj-prompt').value, enabled: state?.dj?.enabled } }).then((data) => { state = newest(data); render(); }).catch((error) => toast(error.message));
+
+      // Not row-by-row removal, which reads each row as a dislike.
+      $('queue-clear').onclick = async () => {
+        try {
+          state = newest(await api('/queue', { method: 'POST', body: { action: 'clear', keepCurrent: true } }));
+          render();
+          pokeEngine();
+        } catch (error) { toast(failureText(error)); }
+      };
+
+      $('queue').onclick = async (event) => {
+        const like = event.target.closest('[data-like]');
+        const jump = event.target.closest('[data-jump]')?.dataset.jump;
+        const remove = event.target.closest('[data-remove]');
+        try {
+          // A heart inside a row must not also count as "play this row".
+          if (like) {
+            const track = state?.queue?.[Number(like.dataset.like)];
+            if (!track) return;
+            await sendTaste(track, track.liked ? 'none' : 'liked', like);
+            return;
+          }
+          if (remove) {
+            // The host drops the row and, for an unrated track, records the
+            // removal as the same dislike the transport ✕ makes — one request.
+            // The confirm names the click, not that side effect of it.
+            if (await removeFromList(Number(remove.dataset.remove), remove)) toast(t('removed'));
+          } else if (jump !== undefined) {
+            state = newest(await api('/queue', { method: 'POST', body: { action: 'jump', index: Number(jump) } }));
+          } else return;
+          render();
+          pokeEngine();
+        } catch (error) { toast(failureText(error)); }
+      };
+
+      // ------------------------------------------------------------------ boot
+      /**
+       * The host pushes its state over `/events` whenever something here would
+       * change. `/state` is re-read every `POLL_MS` only while that stream is
+       * down — a browser without EventSource, a host that predates the route,
+       * a reconnect under way — and every `STREAM_POLL_MS` while it is up, as
+       * a safety net that also ages the boosts' minutes left.
+       */
+      const POLL_MS = 1500;
+      const STREAM_POLL_MS = 30_000;
+      /** A stream the browser gave up on (an error answer) is opened again after this. */
+      const RELISTEN_MS = 10_000;
+      let events = null;
+      let receivedAt = 0;
+
+      function adopt(next) {
+        receivedAt = Date.now();
+        if (newest(next) !== next) return;
+        state = next;
+        render();
+        applyTransport();
+      }
+
+      async function refresh() {
+        try {
+          adopt(await api('/state'));
+        } catch (error) {
+          setText($('np-title'), t('connectFailed') + error.message);
+        }
+      }
+
+      function listen() {
+        const Source = window.EventSource;
+        if (typeof Source !== 'function') return;
+        events = new Source(API + '/events');
+        events.onopen = () => {
+          streaming = true;
+          // The host may have restarted, and its versions with it.
+          versionFloor = 0;
+        };
+        events.onerror = () => {
+          streaming = false;
+          // A dropped connection is retried by the browser; an error status
+          // closes the stream for good, so it is opened again from here.
+          if (events.readyState === Source.CLOSED) {
+            events = null;
+            setTimeout(listen, RELISTEN_MS);
+          }
+        };
+        events.addEventListener('state', (event) => {
+          try { adopt(JSON.parse(event.data)); } catch { /* the next frame or poll repairs it */ }
+        });
+      }
+
+      paintStaticIcons();
+      applyLocale();
+      watchShellLocale();
+      syncShellTheme();
+      refresh();
+      listen();
+      setInterval(() => {
+        if (!streaming || Date.now() - receivedAt >= STREAM_POLL_MS) refresh();
+        // A refused play changes nothing on the host, so no update would come
+        // to retry it: a page that owns its audio retries on this clock.
+        else applyTransport();
+      }, POLL_MS);
+      void loadModelPicker();
+      void loadQuality();
+      // Progress and lyric highlighting follow the audio element, which lives
+      // in the shell document and reports nothing here, so they need their own
+      // repaint clock.
+      setInterval(() => { paintProgress(); paintLyrics(); prefetchNextIntro(); }, 250);
+      window.addEventListener('beforeunload', () => {
+        clearInterval(qrTimer);
+        events?.close();
+      });
+    </script>
+  </body>
+</html>

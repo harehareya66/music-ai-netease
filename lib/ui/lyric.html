@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>歌词二创 · 网易云音乐</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
+    --text:#E8EAED; --muted:#8B909A; --red:#E5484D; --teal:#2FB3A6; --amber:#F5A524;
+    --r-sm:8px; --r:14px; --r-lg:20px;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:26px 32px 24px;
+  }
+  [hidden]{ display:none !important; }
+  a{ color:inherit; text-decoration:none; }
+  button,input{ font-family:inherit; }
+  .page{ width:100%; }
+  .top{ display:flex; align-items:center; gap:14px; margin-bottom:20px; flex-wrap:wrap; min-height:34px; }
+  .back{
+    width:30px; height:30px; flex:0 0 30px; border-radius:8px; border:1px solid var(--line);
+    display:grid; place-items:center; color:var(--muted); background:var(--card);
+    transition:color .15s, border-color .15s;
+  }
+  .back:hover{ color:var(--text); border-color:#39404d; }
+  .back svg{ width:16px; height:16px; display:block; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  h1{ font-size:20px; font-weight:600; margin:0; letter-spacing:.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:56vw; }
+  h1 small{ font-size:13px; font-weight:400; color:var(--muted); margin-left:10px; }
+  .modes{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .chip{
+    height:30px; padding:0 12px; border-radius:8px; background:#1B1F26; border:1px solid #2B303A;
+    color:#B7BCC6; font-size:12.5px; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; white-space:nowrap; transition:color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover:not(:disabled){ color:var(--text); border-color:#39404d; }
+  .chip.on{ background:var(--red); border-color:var(--red); color:#fff; font-weight:600; }
+  .chip:disabled{ cursor:default; opacity:.55; }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch; }
+  .card{ border:1px solid var(--line); border-radius:var(--r); background:var(--card); display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .hd{ display:flex; align-items:center; gap:9px; padding:15px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .hd b{ font-size:13px; }
+  .hd .hint{ font-size:11.5px; color:var(--muted); }
+  .hd .badge{
+    margin-left:auto; font-size:11px; color:#9FD8D0; background:rgba(47,179,166,.1);
+    border:1px solid rgba(47,179,166,.3); border-radius:20px; padding:2px 9px; white-space:nowrap;
+  }
+  .hd .badge.red{ color:#FFB3B5; background:rgba(229,72,77,.1); border-color:rgba(229,72,77,.32); }
+  .body{ flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:2px; min-height:0; max-height:62vh; overflow:auto; position:relative; }
+  .line{ display:grid; grid-template-columns:44px minmax(0,1fr); align-items:start; gap:16px; padding:7px 8px; border-radius:8px; border:1px solid transparent; cursor:pointer; user-select:none; }
+  .line:hover{ background:rgba(255,255,255,.025); }
+  .line .tm{ font-size:11px; color:#5F6570; font-variant-numeric:tabular-nums; padding-top:3px; }
+  .line .tx{ font-size:15px; line-height:1.75; color:#C9CDD6; min-width:0; text-align:left; word-break:break-word; }
+  .line.cur{ background:rgba(229,72,77,.08); }
+  .line.cur .tx{ color:#F3F4F6; font-weight:600; }
+  .line.cur .tx em, .line .tx em.curw{ font-style:normal; color:#FF8A8D; }
+  .line.sel{ background:rgba(47,179,166,.07); border-color:rgba(47,179,166,.18); }
+  .line .tx em{ font-style:normal; }
+
+  .poem{ padding:18px 20px; font-size:16px; line-height:2.1; color:#DDE1E7; letter-spacing:.4px; flex:1; min-height:0; max-height:62vh; overflow:auto; }
+  .poem p{ margin:0 0 2px; }
+  .poem p.first{ color:#FF9EA1; }
+  .poem .placeholder{ font-size:13px; line-height:1.9; color:var(--muted); letter-spacing:0; }
+  .poem .placeholder b{ color:#CDD1D8; font-weight:500; }
+
+  .foot{ display:flex; align-items:center; gap:10px; padding:13px 18px; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .btn{
+    height:32px; padding:0 14px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    gap:6px; font-size:12.5px; color:#C9CDD6; border:1px solid var(--line); background:#13161C; cursor:pointer;
+    transition:background .15s, border-color .15s, color .15s, opacity .15s; white-space:nowrap;
+  }
+  .btn:hover:not(:disabled){ background:#1B1F26; border-color:#39404d; color:var(--text); }
+  .btn.primary{ border:none; background:var(--red); color:#fff; font-weight:600; box-shadow:0 8px 18px -10px rgba(229,72,77,.9); }
+  .btn.primary:hover:not(:disabled){ background:#ef5559; color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .foot .note{ margin-left:auto; font-size:11.5px; color:#5F6570; }
+  .foot .note.warn{ color:#e0a6a8; }
+
+  .bottom{
+    margin-top:16px; display:flex; align-items:center; gap:12px; padding:14px 18px;
+    border:1px solid var(--line); border-radius:var(--r); background:var(--card); flex-wrap:wrap;
+  }
+  .bottom .lab{ font-size:12px; color:var(--muted); }
+  .bottom .chip{ height:28px; padding:0 12px; }
+  .bottom .r{ margin-left:auto; display:flex; gap:8px; align-items:center; font-size:11.5px; color:#5F6570; }
+
+  /* states */
+  .loading{ padding:26px 0; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--muted); font-size:12.5px; }
+  .spinner{ width:16px; height:16px; border-radius:50%; border:2px solid #2b303a; border-top-color:var(--red); animation:spin .9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .errorbar{
+    display:flex; align-items:center; gap:12px; margin-bottom:16px; padding:10px 12px 10px 14px;
+    border:1px solid rgba(229,72,77,.4); background:rgba(229,72,77,.09); border-radius:10px;
+    font-size:12.5px; color:#f3c4c6;
+  }
+  .errorbar .msg{ min-width:0; flex:1; }
+  .errorbar button{
+    flex:0 0 auto; height:26px; padding:0 12px; border-radius:8px; cursor:pointer;
+    border:1px solid rgba(229,72,77,.45); background:rgba(229,72,77,.16); color:#ffd9da; font-size:12px;
+  }
+  .errorbar button:hover{ background:rgba(229,72,77,.24); }
+
+  .empty{ padding:44px 24px; text-align:center; border:1px solid var(--line); border-radius:var(--r-lg); background:var(--card); }
+  .empty .glyph{ width:52px; height:52px; margin:0 auto 16px; border-radius:50%; display:grid; place-items:center; border:1px solid var(--line); color:var(--muted); font-size:20px; background:#1b1f27; }
+  .empty h2{ margin:0; font-size:16px; font-weight:600; }
+  .empty p{ margin:8px auto 18px; max-width:460px; font-size:12.5px; color:var(--muted); line-height:1.9; }
+  .pick{ display:flex; gap:9px; justify-content:center; max-width:380px; margin:0 auto; }
+  .pick input{
+    flex:1; min-width:0; height:36px; padding:0 12px; border-radius:9px;
+    border:1px solid #2e3440; background:rgba(15,17,21,.55); color:var(--text); font-size:12.5px; outline:none;
+  }
+  .pick input:focus{ border-color:rgba(229,72,77,.5); }
+  .pick .btn{ height:36px; padding:0 16px; border-radius:9px; }
+  .empty .tiny{ margin-top:12px; font-size:11px; color:#5F6570; }
+  .emptyLyric{ margin:20px 0; padding:24px 12px; text-align:center; border:1px dashed var(--line); border-radius:var(--r-sm); font-size:12px; line-height:1.9; color:var(--muted); }
+  .foot .tiny{ font-size:11px; color:#5F6570; }
+  .toast{
+    position:fixed; left:50%; bottom:34px; transform:translateX(-50%); z-index:50;
+    padding:9px 16px; border-radius:10px; font-size:12.5px; color:var(--text);
+    background:#232833; border:1px solid #333a46; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    animation:tin .18s ease both; max-width:80vw; text-align:center;
+  }
+  @keyframes tin{ from{ opacity:0; transform:translate(-50%,6px); } to{ opacity:1; transform:translate(-50%,0); } }
+
+  @media (max-width:1120px){
+    body{ padding:20px 20px 24px; }
+    .grid{ grid-template-columns:minmax(0,1fr); }
+    .modes{ margin-left:0; flex-wrap:wrap; justify-content:flex-start; }
+    .h1{ max-width:100%; }
+    h1{ max-width:100%; white-space:normal; }
+    .bottom{ flex-wrap:wrap; }
+    .bottom .r{ margin-left:0; }
+    .body,.poem{ max-height:none; }
+    .foot .note{ margin-left:0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <a class="back" href="__BASE__/panel" title="返回面板" aria-label="返回面板">
+      <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+    </a>
+    <h1 id="title">歌词二创<small id="trackMeta"></small></h1>
+    <div class="modes" id="modes"></div>
+  </header>
+
+  <div id="error" class="errorbar" role="alert" hidden>
+    <span class="msg" id="errorMsg"></span>
+    <button type="button" id="retry">重试</button>
+  </div>
+
+  <div class="loading" id="loading"><div class="spinner"></div><span>正在取这首歌的歌词…</span></div>
+
+  <main id="main" hidden>
+    <div class="grid">
+      <section class="card" aria-label="原词">
+        <div class="hd">
+          <b>原词</b><span class="hint" id="lyricHint">逐行时间轴</span>
+          <span class="badge" id="nowBadge" hidden></span>
+        </div>
+        <div class="body" id="lyricBody"></div>
+        <div class="foot">
+          <button class="btn" type="button" id="remixSelected" disabled>改写选中的行</button>
+          <span class="note" id="selectedNote">点一行选中</span>
+        </div>
+      </section>
+
+      <section class="card" aria-label="二创">
+        <div class="hd">
+          <b id="remixTitle">改写</b><span class="hint" id="remixHint"></span>
+          <span class="badge" id="remixBadge" hidden></span>
+        </div>
+        <div class="poem" id="remixBody"></div>
+        <div class="foot">
+          <button class="btn primary" type="button" id="regenerate" disabled>重新生成</button>
+          <button class="btn" type="button" id="copy" disabled>复制</button>
+          <span class="note">结果只存在本机 · 不进账号</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="bottom">
+      <span class="lab">改写范围</span>
+      <button class="chip on" type="button" data-scope="all">整首</button>
+      <button class="chip" type="button" data-scope="selection" disabled>选中的行</button>
+      <button class="chip" type="button" disabled title="接口暂不支持只改副歌；可以手动选中副歌那几行">只改副歌</button>
+      <span class="r">只把歌词文本发给模型 · 不发送账号信息与 cookie</span>
+    </div>
+  </main>
+
+  <section class="empty" id="empty" hidden>
+    <div class="glyph">✎</div>
+    <h2>还没有选歌</h2>
+    <p>面板里正好有歌在放的话，这里会自动跟上；也可以直接输入歌曲 id 取歌词。只读歌词，不写账号。</p>
+    <div class="pick">
+      <input id="pickId" type="text" inputmode="numeric" autocomplete="off" placeholder="歌曲 id，例如 19723756">
+      <button class="btn" type="button" id="pickLoad">载入</button>
+    </div>
+    <div class="tiny">也可以从面板点这首歌进来看</div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var MODES = [
+    { key:'翻译',     label:'翻译',       hint:'保持原意，换一种语言' },
+    { key:'改诗',     label:'改写成诗',   hint:'保持原意，去掉口水词' },
+    { key:'藏头',     label:'藏头',       hint:'每行首字连成一句话' },
+    { key:'短视频文案', label:'短视频文案', hint:'短句分行，适合口播' }
+  ];
+  var MODE_LABEL = {};
+  var MODE_HINT = {};
+  MODES.forEach(function(m){ MODE_LABEL[m.key] = m.label; MODE_HINT[m.key] = m.hint; });
+
+  var state = {
+    id: null,
+    track: null,
+    lyrics: null,
+    lines: [],
+    selection: null,
+    scope: 'all',
+    mode: '改诗',
+    remix: null,
+    remixScope: 'all',
+    loadingLyrics: false,
+    loadingRemix: false,
+    position: 0,
+    playing: false,
+    currentId: null,
+    lastCur: -1,
+    drag: null
+  };
+
+  function $(sel, root){ return (root || document).querySelector(sel); }
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+  function num(v){ return typeof v === 'number' && isFinite(v) ? v : 0; }
+  function fmt(v, digits){
+    var n = typeof v === 'number' && isFinite(v) ? v : 0;
+    var d = digits === undefined ? 0 : digits;
+    var p = Math.pow(10, d);
+    return String(Math.round(n * p) / p);
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function fmtTime(ms){
+    var total = Math.max(0, Math.floor(num(ms) / 1000));
+    var m = Math.floor(total / 60);
+    var s = total % 60;
+    return pad2(m) + ':' + pad2(s);
+  }
+
+  var toastTimer = null;
+  function toast(msg){
+    var t = $('#toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.hidden = true; }, 2800);
+  }
+  function showError(msg){
+    $('#errorMsg').textContent = msg || '操作失败，请重试';
+    $('#error').hidden = false;
+  }
+  function hideError(){ $('#error').hidden = true; }
+
+  async function request(url, options){
+    var init = options || {};
+    init.headers = Object.assign({}, init.headers || {});
+    if (init.body && !init.headers['Content-Type']) init.headers['Content-Type'] = 'application/json';
+    var res = await fetch(url, init);
+    var data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      var msg = (data && data.error) || ('请求失败（' + res.status + '）');
+      var err = new Error(msg);
+      err.status = res.status;
+      err.code = data && data.code;
+      throw err;
+    }
+    return data;
+  }
+
+  /* ---------- boot ---------- */
+  function idFromUrl(){
+    var raw = new URLSearchParams(window.location.search).get('id');
+    var id = Number(raw);
+    return isFinite(id) && id > 0 ? id : null;
+  }
+
+  async function boot(){
+    var id = idFromUrl();
+    if (!id) {
+      try {
+        var snapshot = await request('__BASE__/api/state');
+        if (snapshot && snapshot.current && snapshot.current.id !== undefined) id = Number(snapshot.current.id);
+        if (snapshot && snapshot.reported && snapshot.reported.trackId !== undefined && !id) id = Number(snapshot.reported.trackId);
+        if (id && snapshot && snapshot.reported) {
+          state.position = num(snapshot.reported.position);
+          state.playing = !!snapshot.playing;
+          if (snapshot.current && snapshot.current.id !== undefined) state.currentId = Number(snapshot.current.id);
+        }
+      } catch (e) { /* 没有播放快照也不阻塞手填 id */ }
+    }
+    renderModes();
+    updateScopeChips();
+    if (!id) { showPicker(); return; }
+    loadLyrics(id);
+    startPolling();
+  }
+
+  function showPicker(){
+    $('#loading').hidden = true;
+    $('#main').hidden = true;
+    $('#empty').hidden = false;
+  }
+
+  function renderModes(){
+    var host = $('#modes');
+    host.textContent = '';
+    MODES.forEach(function(m){
+      var btn = el('button', 'chip' + (m.key === state.mode ? ' on' : ''), m.label);
+      btn.type = 'button';
+      btn.setAttribute('data-mode', m.key);
+      btn.addEventListener('click', function(){ switchMode(m.key); });
+      host.appendChild(btn);
+    });
+  }
+
+  function updateModeChips(){
+    var chips = document.querySelectorAll('#modes [data-mode]');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('on', chips[i].getAttribute('data-mode') === state.mode);
+      chips[i].disabled = state.loadingRemix;
+    }
+  }
+
+  function updateScopeChips(){
+    var chips = document.querySelectorAll('.bottom [data-scope]');
+    var active = state.scope;
+    if (active === 'selection' && !state.selection) active = 'all';
+    for (var i = 0; i < chips.length; i++) {
+      var scope = chips[i].getAttribute('data-scope');
+      chips[i].classList.toggle('on', scope === active);
+      if (scope === 'selection') chips[i].disabled = state.loadingLyrics || state.loadingRemix || !state.selection;
+    }
+  }
+
+  /* ---------- lyric ---------- */
+  async function loadLyrics(id){
+    if (state.loadingLyrics) return;
+    state.loadingLyrics = true;
+    hideError();
+    $('#loading').hidden = false;
+    $('#main').hidden = true;
+    state.id = id;
+    state.selection = null;
+    state.lastCur = -1;
+    var autoRemix = false;
+    try {
+      var qs = new URLSearchParams();
+      qs.set('id', String(id));
+      var data = await request('__BASE__/api/lyric?' + qs.toString());
+      state.track = data && data.track ? data.track : null;
+      state.lyrics = data && data.lyrics ? data.lyrics : null;
+      var rawLines = state.lyrics && Array.isArray(state.lyrics.lines) ? state.lyrics.lines.slice() : [];
+      /* 作词/作曲/编曲…这类制作信息行不属于歌词正文（服务端已过滤，前端再兜一层） */
+      var metaLine = /^(作词|作曲|编曲|制作人|制作|出品|监制|混音|母带|录音|吉他|贝斯|鼓|键盘|弦乐|和声|词|曲|OP|SP)\s*[:：]/;
+      state.lines = rawLines.filter(function(line){
+        return line && !metaLine.test(String(line.text || '').trim());
+      });
+      $('#loading').hidden = true;
+      $('#empty').hidden = true;
+      $('#main').hidden = false;
+      renderTrackHead();
+      renderLyrics();
+      renderSelectionUI();
+      if (state.lines.length) {
+        renderRemixPlaceholder('还没有生成结果', '点下方「开始改写」，让模型把这首词换个写法。');
+        autoRemix = true;
+        setRemixButtons(true);
+      } else {
+        renderRemixPlaceholder('这首歌没有可用的歌词', '换一首带歌词的歌再看，或者回面板换一首。');
+        setRemixButtons(false);
+      }
+    } catch (err) {
+      $('#loading').hidden = true;
+      showError(err && err.message ? err.message : '取歌词失败，请重试');
+      if (!state.track) {
+        $('#main').hidden = true;
+        $('#empty').hidden = false;
+      }
+    } finally {
+      state.loadingLyrics = false;
+      updateScopeChips();
+    }
+    /* loadingLyrics 已复位后再触发，否则会被 requestRemix 的并发守卫挡掉 */
+    if (autoRemix) requestRemix({ scope: state.scope === 'selection' ? 'selection' : 'all' });
+  }
+
+  function renderTrackHead(){
+    var t = state.track || {};
+    var title = $('#title');
+    title.textContent = '歌词二创';
+    if (t.name) {
+      title.textContent = t.name;
+      var small = el('small', null, '');
+      var artists = Array.isArray(t.artists) ? t.artists.filter(Boolean).join(' / ') : '';
+      var bits = [];
+      if (artists) bits.push(artists);
+      if (t.album) bits.push(t.album);
+      if (num(t.duration) > 0) bits.push(fmtTime(t.duration));
+      small.textContent = bits.length ? '  ' + bits.join(' · ') : '';
+      title.appendChild(small);
+    } else {
+      var fallback = el('small', null, '  歌曲 ' + state.id);
+      title.appendChild(fallback);
+    }
+    document.title = (t.name || '歌词二创') + ' · 网易云音乐';
+  }
+
+  function renderLyrics(){
+    var body = $('#lyricBody');
+    body.textContent = '';
+    $('#lyricHint').textContent = state.lines.length ? (state.lyrics && state.lyrics.wordLevel ? '逐字时间轴' : '逐行时间轴') : '无字';
+    if (!state.lines.length) {
+      body.appendChild(el('div', 'emptyLyric', '这首歌没有可用的歌词，二创无从下手。'));
+      return;
+    }
+    state.lines.forEach(function(line, i){
+      var row = el('div', 'line');
+      row.setAttribute('data-i', String(i));
+      row.appendChild(el('span', 'tm', fmtTime(line.t)));
+      var tx = el('span', 'tx');
+      if (Array.isArray(line.words) && line.words.length) {
+        line.words.forEach(function(word){
+          var span = el('em', 'wd', word.text || '');
+          span.setAttribute('data-t', String(num(word.t)));
+          span.setAttribute('data-end', String(num(word.end)));
+          tx.appendChild(span);
+        });
+      } else {
+        tx.textContent = line.text || '';
+      }
+      row.appendChild(tx);
+      body.appendChild(row);
+    });
+    highlightCurrent(true);
+  }
+
+  /* ---------- selection ---------- */
+  function normalizeSelection(a, b){
+    var from = Math.min(a, b), to = Math.max(a, b);
+    return { from: from, to: to };
+  }
+  function setSelection(a, b){
+    if (a === null || a === undefined) {
+      state.selection = null;
+    } else {
+      var max = state.lines.length - 1;
+      if (max < 0) return;
+      var from = Math.max(0, Math.min(max, Math.min(a, b)));
+      var to = Math.max(0, Math.min(max, Math.max(a, b)));
+      state.selection = { from: from, to: to };
+    }
+    renderSelectionUI();
+  }
+  function renderSelectionUI(){
+    var rows = $('#lyricBody').querySelectorAll('.line');
+    var sel = state.selection;
+    for (var i = 0; i < rows.length; i++) {
+      var inside = sel && i >= sel.from && i <= sel.to;
+      rows[i].classList.toggle('sel', !!inside);
+    }
+    var count = sel ? (sel.to - sel.from + 1) : 0;
+    var note = $('#selectedNote');
+    note.className = 'note';
+    note.textContent = count > 0 ? ('已选 ' + count + ' 行') : '点一行选中';
+    $('#remixSelected').disabled = !count || state.loadingLyrics || state.loadingRemix;
+    if (!count && state.scope === 'selection') state.scope = 'all';
+    updateScopeChips();
+  }
+
+  /* ---------- remix ---------- */
+  function currentScope(){
+    return state.scope === 'selection' && state.selection ? 'selection' : 'all';
+  }
+
+  function selectionRange(){
+    var sel = state.selection;
+    if (!sel) return null;
+    var first = state.lines[sel.from];
+    var last = state.lines[sel.to];
+    if (!first || !last) return null;
+    var from = num(first.t);
+    var to = num(last.end);
+    if (!to && state.lines[sel.to + 1]) to = num(state.lines[sel.to + 1].t);
+    if (!to) to = from + 4000;
+    return { from: from, to: to };
+  }
+
+  function syncRegenerate(){
+    var btn = $('#regenerate');
+    if (!btn) return;
+    btn.textContent = state.remix ? '重新生成' : '开始改写';
+    btn.disabled = state.loadingRemix || !state.lines.length;
+  }
+
+  function setRemixBusy(on){
+    state.loadingRemix = on;
+    $('#remixSelected').disabled = on || !state.selection;
+    syncRegenerate();
+    $('#copy').disabled = on || !(state.remix && state.remix.text);
+    updateModeChips();
+    updateScopeChips();
+    if (on) {
+      $('#remixHint').textContent = '模型正在写…';
+      $('#remixHint').className = 'hint warn';
+    } else {
+      $('#remixHint').className = 'hint';
+      $('#remixHint').textContent = MODE_HINT[state.mode] || '';
+    }
+  }
+
+  function setRemixButtons(){
+    syncRegenerate();
+    $('#copy').disabled = !(state.remix && state.remix.text);
+  }
+
+  async function requestRemix(opts){
+    opts = opts || {};
+    if (!state.lines.length || state.loadingLyrics) return;
+    if (state.loadingRemix) return;
+    var scope = opts.scope || currentScope();
+    if (scope === 'selection' && !state.selection) scope = 'all';
+    var body = { id: state.id, mode: state.mode, scope: scope };
+    if (scope === 'selection') {
+      var range = selectionRange();
+      if (!range) scope = 'all';
+      else { body.from = range.from; body.to = range.to; }
+    }
+    state.remixScope = scope;
+    hideError();
+    setRemixBusy(true);
+    if (!state.remix) renderRemixPlaceholder('生成中', '模型正在把歌词改写成' + (MODE_LABEL[state.mode] || '别的形式') + '…');
+    try {
+      var data = await request('__BASE__/api/lyric/remix', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      var remix = data && data.remix;
+      if (!remix || !String(remix.text || '').trim()) throw new Error('模型没有返回可用内容，请重试');
+      state.remix = remix;
+      renderRemix();
+    } catch (err) {
+      showError(err && err.message ? err.message : '生成失败，请重试');
+      if (!state.remix) {
+        renderRemixPlaceholder('这次没生成出来', '可以重新生成，或者换一种改写方式。');
+      }
+    } finally {
+      setRemixBusy(false);
+      updateModeChips();
+    }
+    renderSelectionUI();
+  }
+
+  function renderRemix(){
+    var remix = state.remix;
+    var box = $('#remixBody');
+    box.textContent = '';
+    if (!remix) {
+      renderRemixPlaceholder('还没有生成', '选好范围，点重新生成。');
+      return;
+    }
+    var label = MODE_LABEL[remix.mode] || MODE_LABEL[state.mode] || '改写';
+    $('#remixTitle').textContent = label;
+    $('#remixHint').className = 'hint';
+    $('#remixHint').textContent = MODE_HINT[remix.mode] || MODE_HINT[state.mode] || '';
+    var badge = $('#remixBadge');
+    if (badge) {
+      var secs = num(remix.elapsedMs) > 0 ? fmt(num(remix.elapsedMs) / 1000, 1) + 's' : '';
+      badge.hidden = false;
+      badge.title = remix.route ? ('route: ' + remix.route) : '';
+      badge.textContent = 'DSH 模型生成' + (secs ? ' · ' + secs : '');
+    }
+    var lines = String(remix.text || '').split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+    if (!lines.length) lines = [String(remix.text || '')];
+    lines.forEach(function(line, i){
+      var p = document.createElement('p');
+      if (i === 0) p.className = 'first';
+      p.textContent = line;
+      box.appendChild(p);
+    });
+    syncRegenerate();
+    $('#copy').disabled = false;
+    if (remix.sourceLines) {
+      $('#remixHint').textContent = (MODE_HINT[remix.mode] || '') + ' · 源 ' + remix.sourceLines + ' 行';
+    }
+  }
+
+  function renderRemixPlaceholder(title, desc){
+    var box = $('#remixBody');
+    box.textContent = '';
+    var wrap = el('div', 'placeholder');
+    wrap.appendChild(el('b', null, title));
+    wrap.appendChild(document.createElement('br'));
+    wrap.appendChild(document.createTextNode(desc || ''));
+    box.appendChild(wrap);
+    if (!state.remix) {
+      $('#remixTitle').textContent = MODE_LABEL[state.mode] || '改写';
+      $('#remixHint').className = 'hint';
+      $('#remixHint').textContent = MODE_HINT[state.mode] || '';
+      var badge = $('#remixBadge');
+      if (badge) badge.hidden = true;
+    }
+    syncRegenerate();
+  }
+
+  function switchMode(mode){
+    if (state.loadingRemix || state.loadingLyrics) return;
+    if (state.mode === mode) return;
+    state.mode = mode;
+    updateModeChips();
+    if (state.lines.length) {
+      requestRemix({ scope: currentScope() });
+    } else {
+      $('#remixTitle').textContent = MODE_LABEL[mode] || '改写';
+      $('#remixHint').textContent = MODE_HINT[mode] || '';
+    }
+  }
+
+  /* ---------- current line ---------- */
+  function highlightCurrent(force){
+    var rows = $('#lyricBody').querySelectorAll('.line');
+    if (!rows.length) {
+      var badge0 = $('#nowBadge');
+      if (badge0) badge0.hidden = true;
+      return;
+    }
+    var idx = -1;
+    var active = state.currentId !== null && state.currentId === state.id;
+    if (active && state.position > 0) {
+      for (var i = 0; i < state.lines.length; i++) {
+        var line = state.lines[i];
+        var next = state.lines[i + 1];
+        var end = num(line.end) || (next ? num(next.t) : num(line.t) + 4000);
+        if (state.position >= num(line.t) && state.position < end) { idx = i; break; }
+      }
+    }
+    for (var j = 0; j < rows.length; j++) rows[j].classList.toggle('cur', j === idx);
+    var fields = $('#lyricBody').querySelectorAll('.wd');
+    for (var k = 0; k < fields.length; k++) {
+      var isCur = idx >= 0 && state.position >= num(fields[k].getAttribute('data-t')) && state.position < num(fields[k].getAttribute('data-end'));
+      fields[k].classList.toggle('curw', isCur);
+    }
+    var badge = $('#nowBadge');
+    if (badge) {
+      if (active && state.playing) {
+        badge.hidden = false;
+        badge.textContent = '正在播放 · ' + fmtTime(state.position);
+      } else if (active) {
+        badge.hidden = false;
+        badge.textContent = '已暂停 · ' + fmtTime(state.position);
+      } else {
+        badge.hidden = true;
+      }
+    }
+    if (idx >= 0 && idx !== state.lastCur) {
+      state.lastCur = idx;
+      if (state.playing && force !== true) {
+        var body = $('#lyricBody');
+        var row = rows[idx];
+        if (row) {
+          var top = row.offsetTop - body.offsetTop;
+          if (top < body.scrollTop || top + row.offsetHeight > body.scrollTop + body.clientHeight) {
+            body.scrollTop = Math.max(0, top - 16);
+          }
+        }
+      }
+    }
+    if (idx < 0) state.lastCur = -1;
+  }
+
+  async function pollState(){
+    try {
+      var snapshot = await request('__BASE__/api/state');
+      if (!snapshot) return;
+      if (snapshot.current && snapshot.current.id !== undefined) state.currentId = Number(snapshot.current.id);
+      else if (snapshot.reported && snapshot.reported.trackId !== undefined) state.currentId = Number(snapshot.reported.trackId);
+      state.playing = !!snapshot.playing;
+      if (snapshot.reported) state.position = num(snapshot.reported.position);
+      highlightCurrent();
+    } catch (e) { /* 预览无播放器时静默 */ }
+  }
+
+  var pollTimer = null;
+  function startPolling(){
+    if (pollTimer) return;
+    pollState();
+    pollTimer = setInterval(function(){
+      if (!document.hidden) pollState();
+    }, 2500);
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden) pollState();
+    });
+  }
+
+  /* ---------- copy ---------- */
+  async function copyRemix(){
+    if (!state.remix || !state.remix.text) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(state.remix.text);
+        toast('二创已复制');
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = state.remix.text;
+      ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      ta.remove();
+      toast(ok ? '二创已复制' : '复制失败，请手动选择文本');
+    } catch (e) {
+      toast('复制失败，请手动选择文本');
+    }
+  }
+
+  /* ---------- events ---------- */
+  function bindLineSelection(){
+    var body = $('#lyricBody');
+    body.addEventListener('pointerdown', function(ev){
+      var row = ev.target.closest('.line');
+      if (!row) return;
+      var i = Number(row.getAttribute('data-i'));
+      if (!isFinite(i)) return;
+      ev.preventDefault();
+      /* capture previous selection before overwriting it */
+      var prev = state.selection;
+      state.drag = {
+        start: i,
+        focus: i,
+        moved: false,
+        wasSelected: !!(prev && prev.from === i && prev.to === i)
+      };
+      setSelection(i, i);
+    });
+    body.addEventListener('pointerover', function(ev){
+      var drag = state.drag;
+      if (!drag) return;
+      var row = ev.target.closest('.line');
+      if (!row) return;
+      var i = Number(row.getAttribute('data-i'));
+      if (!isFinite(i) || i === drag.focus) return;
+      drag.focus = i;
+      drag.moved = true;
+      setSelection(drag.start, i);
+    });
+    window.addEventListener('pointerup', function(){
+      var drag = state.drag;
+      state.drag = null;
+      if (!drag) return;
+      /* 再点一次同一行取消选中 */
+      if (!drag.moved && drag.wasSelected) setSelection(null, null);
+    });
+  }
+
+  function bind(){
+    $('#retry').addEventListener('click', function(){
+      if (state.loadingLyrics || state.loadingRemix) return;
+      if (state.lines.length) requestRemix({ scope: currentScope() });
+      else if (state.id) loadLyrics(state.id);
+    });
+    $('#regenerate').addEventListener('click', function(){
+      requestRemix({ scope: currentScope() });
+    });
+    $('#remixSelected').addEventListener('click', function(){
+      if (!state.selection) { toast('先点一行或多行选中'); return; }
+      state.scope = 'selection';
+      updateScopeChips();
+      requestRemix({ scope: 'selection' });
+    });
+    $('#copy').addEventListener('click', copyRemix);
+    document.querySelector('.bottom').addEventListener('click', function(ev){
+      var btn = ev.target.closest('[data-scope]');
+      if (!btn || btn.disabled) return;
+      state.scope = btn.getAttribute('data-scope');
+      updateScopeChips();
+    });
+    $('#pickLoad').addEventListener('click', tryPick);
+    $('#pickId').addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter') { ev.preventDefault(); tryPick(); }
+    });
+    bindLineSelection();
+  }
+
+  function tryPick(){
+    var id = Number(String($('#pickId').value || '').trim());
+    if (!isFinite(id) || id <= 0) { showError('请输入正确的歌曲 id'); return; }
+    hideError();
+    $('#pickId').value = '';
+    loadLyrics(id);
+    startPolling();
+  }
+
+  renderModes();
+  updateScopeChips();
+  setRemixButtons(false);
+  bind();
+  boot();
+})();
+</script>
+</body>
+</html>

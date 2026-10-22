@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>场景歌单 · 网易云音乐</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --line:#262A33; --text:#E8EAED; --muted:#8B909A;
+    --red:#E5484D; --teal:#2FB3A6;
+    --r-sm:8px; --r:14px; --r-lg:20px;
+    --g1:#E8EAED; --g2:#8B909A; --g3:#5A6070; --g4:#3A3F4A;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    min-height:100vh; background:var(--bg); color:var(--text);
+    font:14px/1.6 "Microsoft YaHei UI", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(760px 340px at 76% -10%, rgba(229,72,77,.10), transparent 62%),
+      radial-gradient(640px 300px at 6% -8%, rgba(47,179,166,.055), transparent 60%);
+  }
+  [hidden]{ display:none !important; }
+  a{ color:inherit; text-decoration:none; }
+  button,input{ font-family:inherit; }
+  .page{ position:relative; z-index:1; width:100%; padding:26px 32px 48px; }
+
+  .top{ display:flex; align-items:center; gap:15px; min-height:44px; }
+  .back{
+    width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--muted);
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .back:hover{ color:var(--text); border-color:#39404d; background:#1b1f27; }
+  .back svg{ width:15px; height:15px; display:block; }
+  h1{ margin:0; font-size:20px; font-weight:600; letter-spacing:.3px; line-height:1.3; }
+  .sub{ margin-top:4px; font-size:12px; color:var(--muted); }
+  .badge{
+    margin-left:auto; display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 11px;
+    border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.025);
+    font-size:11.5px; color:var(--muted); white-space:nowrap;
+  }
+  .badge .dot{ width:6px; height:6px; border-radius:50%; background:var(--teal); }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); }
+  .panel{ padding:17px 18px 16px; min-width:0; }
+  .phead{ display:flex; align-items:baseline; gap:8px; }
+  .phead h2{ margin:0; font-size:13.5px; font-weight:600; letter-spacing:.2px; }
+  .phead .note{ margin-left:auto; font-size:11px; color:var(--muted); }
+  .hint{ font-size:11.5px; color:var(--muted); }
+
+  /* composer */
+  .composer{ margin-top:16px; padding:20px 22px 18px; border:1px solid var(--line); border-radius:var(--r-lg); background:linear-gradient(118deg, rgba(229,72,77,.12), rgba(47,179,166,.045) 62%, rgba(23,26,32,0) 100%); }
+  .composer .label{ font-size:11px; letter-spacing:.14em; color:var(--muted); }
+  .askrow{ display:flex; gap:10px; margin-top:11px; }
+  .ask{
+    flex:1; min-width:0; height:44px; padding:0 15px; border-radius:11px;
+    border:1px solid #2e3440; background:rgba(15,17,21,.55); color:var(--text); font-size:13.5px;
+    outline:none; transition:border-color .15s, background .15s;
+  }
+  .ask::placeholder{ color:#6b7280; }
+  .ask:focus{ border-color:rgba(229,72,77,.55); background:rgba(15,17,21,.8); }
+  .ask:disabled{ opacity:.6; }
+  .gen{
+    flex:0 0 auto; height:44px; padding:0 22px; border-radius:11px; cursor:pointer;
+    border:1px solid var(--red); background:var(--red); color:#fff; font-size:13px; font-weight:500;
+    transition:background .15s, border-color .15s, opacity .15s;
+  }
+  .gen:hover:not(:disabled){ background:#ef5559; border-color:#ef5559; }
+  .gen:disabled{ cursor:default; opacity:.6; }
+  .askrow .gen .spin{ display:none; }
+  .gen.busy .spin{ display:inline-block; width:11px; height:11px; border-radius:50%; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; margin-right:7px; animation:spin .8s linear infinite; vertical-align:-1px; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .under{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:12px; }
+  .under .cap{ font-size:11px; color:#6b7280; }
+  .sample{
+    height:26px; padding:0 11px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:rgba(255,255,255,.03); color:#b9bec7; font-size:11.5px;
+    transition:border-color .15s, color .15s;
+  }
+  .sample:hover:not(:disabled){ color:var(--text); border-color:#3b4250; }
+  .sample:disabled{ opacity:.55; cursor:default; }
+  .counts{ display:flex; align-items:center; gap:6px; margin-left:auto; }
+  .counts .cap{ font-size:11px; color:#6b7280; margin-right:2px; }
+  .chip{
+    height:26px; padding:0 11px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:transparent; color:var(--muted); font-size:11.5px;
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover:not(:disabled){ color:var(--text); border-color:#39404d; }
+  .chip.on{ color:var(--text); border-color:rgba(229,72,77,.55); background:rgba(229,72,77,.12); }
+  .chip:disabled{ opacity:.55; cursor:default; }
+
+  /* scene card */
+  .scene-card{
+    position:relative; overflow:hidden; margin-top:14px; padding:17px 20px 15px;
+    border:1px solid var(--line); border-radius:var(--r-lg);
+    background:linear-gradient(112deg, rgba(229,72,77,.14), rgba(229,72,77,.04) 42%, rgba(23,26,32,.2) 100%);
+  }
+  .scene-card::after{ content:""; position:absolute; right:-60px; top:-100px; width:240px; height:240px; border-radius:50%; background:radial-gradient(circle, rgba(229,72,77,.14), transparent 66%); pointer-events:none; }
+  .sayrow{ display:flex; align-items:flex-start; gap:12px; position:relative; z-index:1; }
+  .sayrow .say{ min-width:0; flex:1; }
+  .sayrow .k{ font-size:10.5px; letter-spacing:.14em; color:var(--muted); }
+  .sayrow .q{ margin-top:5px; font-size:16.5px; font-weight:600; line-height:1.55; }
+  .swap{
+    flex:0 0 auto; height:30px; padding:0 13px; border-radius:999px; cursor:pointer;
+    border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:#d5d9df; font-size:12px;
+    transition:background .15s, border-color .15s;
+  }
+  .swap:hover:not(:disabled){ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.22); }
+  .swap:disabled{ opacity:.55; cursor:default; }
+  .filterchips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:13px; position:relative; z-index:1; }
+  .fchip{ padding:3px 9px; border-radius:999px; font-size:11px; color:#cfd3da; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07); }
+  .fchip b{ font-weight:500; color:var(--muted); margin-left:4px; }
+
+  .grid{ display:grid; grid-template-columns:minmax(0,1.5fr) 396px; gap:14px; margin-top:14px; align-items:start; }
+  .side{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+
+  /* draft list */
+  .dhead{ display:flex; align-items:center; gap:9px; }
+  .dhead h2{ margin:0; font-size:13.5px; font-weight:600; }
+  .dhead .meta{ font-size:11px; color:var(--muted); }
+  .dhead .acts{ margin-left:auto; display:flex; gap:7px; }
+  .ghostbtn{
+    height:27px; padding:0 11px; border-radius:8px; cursor:pointer;
+    border:1px solid var(--line); background:transparent; color:var(--muted); font-size:11.5px;
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .ghostbtn:hover:not(:disabled){ color:var(--text); border-color:#39404d; background:#1b1f27; }
+  .ghostbtn:disabled{ opacity:.5; cursor:default; }
+  .semantic{ margin-top:9px; padding:8px 10px; border-radius:var(--r-sm); background:rgba(255,255,255,.028); font-size:11.5px; color:var(--muted); line-height:1.7; }
+  .dlist{ margin-top:6px; }
+  .drow{ display:flex; align-items:center; gap:11px; padding:9px 0; border-bottom:1px solid rgba(38,42,51,.7); }
+  .drow:last-child{ border-bottom:0; }
+  .drow .ix{ width:16px; flex:0 0 16px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .cover{ position:relative; width:38px; height:38px; flex:0 0 38px; border-radius:8px; overflow:hidden; background:linear-gradient(140deg,#2c313b,#1b1f27); border:1px solid rgba(255,255,255,.05); }
+  .cover img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  .dmeta{ flex:1; min-width:0; }
+  .dname{ font-size:12.5px; color:#d6dae1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dsub{ margin-top:1px; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .why{ display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+  .w{ font-size:10px; line-height:1.7; padding:0 6px; border-radius:999px; color:var(--muted); background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.055); white-space:nowrap; }
+  .w.reason{ color:#dcb8ba; border-color:rgba(229,72,77,.22); background:rgba(229,72,77,.07); }
+  .rm{
+    flex:0 0 24px; width:24px; height:24px; border-radius:50%; cursor:pointer;
+    border:1px solid transparent; background:transparent; color:#5f6673; font-size:14px; line-height:1;
+    display:grid; place-items:center; transition:color .15s, background .15s, border-color .15s;
+  }
+  .rm:hover{ color:#ffb9bb; background:rgba(229,72,77,.12); border-color:rgba(229,72,77,.25); }
+  .rm:disabled{ opacity:.4; cursor:default; }
+  .dempty{ margin-top:12px; padding:22px 12px; border:1px dashed var(--line); border-radius:var(--r-sm); text-align:center; font-size:12px; color:var(--muted); line-height:1.9; }
+  .dempty .ghostbtn{ margin-top:10px; }
+
+  /* side: sources */
+  .src-row{ display:flex; align-items:center; gap:9px; padding:7px 0; font-size:12px; }
+  .src-row .dot{ width:7px; height:7px; border-radius:2px; flex:0 0 7px; }
+  .src-row .nm{ color:#cdd1d8; }
+  .src-row .ct{ margin-left:auto; color:var(--muted); font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .src-row .wt{ width:44px; text-align:right; font-size:10.5px; color:#5f6673; }
+  .src-note{ margin-top:9px; padding-top:10px; border-top:1px solid rgba(38,42,51,.8); font-size:11px; color:var(--muted); line-height:1.8; }
+  .src-note b{ font-weight:500; color:#cdd1d8; }
+
+  /* side: save */
+  .field{ margin-top:11px; }
+  .field input{
+    width:100%; height:36px; padding:0 11px; border-radius:9px;
+    border:1px solid #2e3440; background:rgba(15,17,21,.55); color:var(--text); font-size:12.5px;
+    outline:none; transition:border-color .15s;
+  }
+  .field input:focus{ border-color:rgba(229,72,77,.5); }
+  .field input:disabled{ opacity:.6; }
+  .saveact{ display:flex; gap:8px; margin-top:10px; }
+  .saveact button{ flex:1; height:34px; border-radius:9px; cursor:pointer; font-size:12.5px; transition:background .15s, border-color .15s, opacity .15s; }
+  .saveact .primary{ border:1px solid var(--red); background:var(--red); color:#fff; }
+  .saveact .primary:hover:not(:disabled){ background:#ef5559; border-color:#ef5559; }
+  .saveact .second{ border:1px solid var(--line); background:transparent; color:#cdd1d8; }
+  .saveact .second:hover:not(:disabled){ background:#1d2129; border-color:#39404d; }
+  .saveact button:disabled{ opacity:.5; cursor:default; }
+  .locked{ margin-top:9px; font-size:11px; color:#6b7280; line-height:1.75; }
+  .lockicon{ display:inline-block; margin-right:4px; color:#7b828e; }
+  .saveTip{ margin-top:10px; padding:8px 10px; border-radius:var(--r-sm); font-size:11.5px; line-height:1.7; display:none; }
+  .saveTip.warn{ display:block; color:#f0c3c4; border:1px solid rgba(229,72,77,.35); background:rgba(229,72,77,.08); }
+  .saveTip.ok{ display:block; color:#a9ded8; border:1px solid rgba(47,179,166,.35); background:rgba(47,179,166,.08); }
+
+  .empty{ margin-top:16px; padding:48px 24px; text-align:center; border:1px solid var(--line); border-radius:var(--r-lg); background:var(--card); }
+  .empty .glyph{ width:52px; height:52px; margin:0 auto 16px; border-radius:50%; display:grid; place-items:center; border:1px solid var(--line); color:var(--muted); font-size:20px; background:#1b1f27; }
+  .empty h2{ margin:0; font-size:16px; font-weight:600; }
+  .empty p{ margin:8px auto 0; max-width:460px; font-size:12.5px; color:var(--muted); line-height:1.9; }
+  .empty .samples{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:18px; }
+
+  .loading{ padding:18px 0 4px; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--muted); font-size:12px; }
+  .spinner{ width:16px; height:16px; border-radius:50%; border:2px solid #2b303a; border-top-color:var(--red); animation:spin .9s linear infinite; }
+  .errorbar{
+    display:flex; align-items:center; gap:12px; margin-top:14px; padding:10px 12px 10px 14px;
+    border:1px solid rgba(229,72,77,.4); background:rgba(229,72,77,.09); border-radius:10px;
+    font-size:12.5px; color:#f3c4c6;
+  }
+  .errorbar .msg{ min-width:0; flex:1; }
+  .errorbar button{
+    flex:0 0 auto; height:26px; padding:0 12px; border-radius:8px; cursor:pointer;
+    border:1px solid rgba(229,72,77,.45); background:rgba(229,72,77,.16); color:#ffd9da; font-size:12px;
+  }
+  .errorbar button:hover{ background:rgba(229,72,77,.24); }
+  .foot{ margin-top:22px; text-align:center; font-size:11px; color:#666c78; letter-spacing:.2px; line-height:1.9; }
+  .toast{
+    position:fixed; left:50%; bottom:34px; transform:translateX(-50%); z-index:50;
+    padding:9px 16px; border-radius:10px; font-size:12.5px; color:var(--text);
+    background:#232833; border:1px solid #333a46; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    animation:tin .18s ease both; max-width:80vw; text-align:center;
+  }
+  @keyframes tin{ from{ opacity:0; transform:translate(-50%,6px); } to{ opacity:1; transform:translate(-50%,0); } }
+
+  @media (max-width:1120px){
+    .page{ padding:20px 20px 40px; }
+    .grid{ grid-template-columns:minmax(0,1fr); }
+    .top{ flex-wrap:wrap; }
+    .badge{ margin-left:0; }
+    .askrow{ flex-wrap:wrap; }
+    .gen{ width:100%; }
+    .counts{ margin-left:0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <a class="back" href="__BASE__/panel" title="返回面板" aria-label="返回面板">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div>
+      <h1>场景歌单</h1>
+      <div class="sub">说一句话，从候选池里挑一张歌单</div>
+    </div>
+    <span class="badge"><span class="dot"></span>AI 解析场景 · 代码选歌排序</span>
+  </header>
+
+  <section class="composer" aria-label="描述场景">
+    <div class="label">你现在想要什么</div>
+    <div class="askrow">
+      <input class="ask" id="brief" type="text" maxlength="80" autocomplete="off"
+             placeholder="比如：下雨天的下午，别太吵，想安静看会儿书">
+      <button class="gen" type="button" id="generate"><span class="spin"></span><span id="genText">生成歌单</span></button>
+    </div>
+    <div class="under">
+      <span class="cap">试试</span>
+      <button class="sample" type="button" data-brief="下雨天的下午，别太吵，想安静看会儿书">雨天下午</button>
+      <button class="sample" type="button" data-brief="深夜开车回家，慢一点，带点电子">深夜开车</button>
+      <button class="sample" type="button" data-brief="周末早晨做早饭，轻快的中文歌">周末早晨</button>
+      <button class="sample" type="button" data-brief="跑步最后两公里，需要一点爆发力">跑步冲刺</button>
+      <div class="counts">
+        <span class="cap">数量</span>
+        <button class="chip" type="button" data-count="15">15 首</button>
+        <button class="chip on" type="button" data-count="25">25 首</button>
+        <button class="chip" type="button" data-count="40">40 首</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="error" class="errorbar" role="alert" hidden>
+    <span class="msg" id="errorMsg"></span>
+    <button type="button" id="retry">重试</button>
+  </div>
+
+  <main id="result" hidden>
+    <section class="scene-card" aria-label="场景摘要">
+      <div class="sayrow">
+        <div class="say">
+          <div class="k">你说</div>
+          <div class="q" id="sayText"></div>
+        </div>
+        <button class="swap" type="button" id="swap">换一批</button>
+      </div>
+      <div class="filterchips" id="filters"></div>
+    </section>
+
+    <div class="grid">
+      <section class="card panel" aria-label="草稿">
+        <div class="dhead">
+          <h2 id="draftTitle">草稿</h2>
+          <span class="meta" id="draftMeta"></span>
+          <div class="acts">
+            <button class="ghostbtn" type="button" id="reorder">按 BPM 重排</button>
+            <button class="ghostbtn" type="button" id="previewAll">试听全部</button>
+          </div>
+        </div>
+        <div class="semantic" id="semantic"></div>
+        <div class="dlist" id="list"></div>
+      </section>
+
+      <aside class="side">
+        <section class="card panel" aria-label="来源计分">
+          <div class="phead"><h2>来源计分</h2><span class="note" id="poolNote"></span></div>
+          <div id="sources"></div>
+          <div class="src-note" id="excluded"></div>
+        </section>
+
+        <section class="card panel" aria-label="保存歌单">
+          <div class="phead"><h2>保存这张草稿</h2><span class="note">先存本地也行</span></div>
+          <div class="field">
+            <input id="name" type="text" maxlength="40" autocomplete="off" placeholder="给这张歌单起个名字">
+          </div>
+          <div class="saveact">
+            <button class="primary" type="button" id="saveLocal">只存本地</button>
+            <button class="second" type="button" id="saveAccount" disabled title="写歌单接口待验证（M0 V2/V3）">存到我的歌单</button>
+          </div>
+          <div class="locked"><span class="lockicon">⌁</span>写歌单接口待验证（M0 V2/V3），现在只能只存本地。</div>
+          <div class="saveTip" id="saveTip"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <section class="empty" id="empty">
+    <div class="glyph">≋</div>
+    <h2>一句话，一张歌单</h2>
+    <p>描述一个场景、一点情绪或一个时间，剩下的交给候选池。选歌、去重、排序都由本机代码完成，模型只负责读懂你的话。</p>
+    <div class="samples">
+      <button class="sample" type="button" data-brief="下雨天的下午，别太吵，想安静看会儿书">下雨天的下午</button>
+      <button class="sample" type="button" data-brief="深夜开车回家，慢一点，带点电子">深夜开车回家</button>
+      <button class="sample" type="button" data-brief="周末早晨做早饭，轻快的中文歌">周末早晨做早饭</button>
+    </div>
+  </section>
+
+  <div class="foot">
+    候选池复用了 AI DJ 的筛选与打分 · 选歌和排序由代码完成 · 不写红心、不写最近播放<br>
+    生成结果只在本机 · 不上传你的账号信息
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var state = {
+    draft: null,
+    items: [],
+    prev: null,
+    count: 25,
+    brief: '',
+    nameDirty: false,
+    generating: false,
+    op: false,
+    lastFailed: null
+  };
+
+  function $(sel, root){ return (root || document).querySelector(sel); }
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+  function num(v){ return typeof v === 'number' && isFinite(v) ? v : 0; }
+  function fmt(v, digits){
+    var n = typeof v === 'number' && isFinite(v) ? v : 0;
+    var d = digits === undefined ? 0 : digits;
+    var p = Math.pow(10, d);
+    return String(Math.round(n * p) / p);
+  }
+  var LANG = { zh:'华语', cn:'华语', en:'英文', ja:'日文', jp:'日文', ko:'韩语', all:'不限', unknown:'未知' };
+  var BAND = { slow:'偏慢', mid:'中速', fast:'偏快', energetic:'高能' };
+  var SOURCE = {
+    search:  { label:'搜索命中', color:'var(--red)' },
+    similar: { label:'相似推荐', color:'var(--g1)' },
+    taste:   { label:'口味偏好', color:'var(--g2)' },
+    daily:   { label:'每日推荐', color:'var(--g3)' }
+  };
+
+  var toastTimer = null;
+  function toast(msg){
+    var t = $('#toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.hidden = true; }, 3200);
+  }
+
+  function showError(msg){
+    $('#errorMsg').textContent = msg || '操作失败，请重试';
+    $('#error').hidden = false;
+  }
+  function hideError(){ $('#error').hidden = true; }
+
+  async function request(url, options){
+    var init = options || {};
+    init.headers = Object.assign({}, init.headers || {});
+    if (init.body && !init.headers['Content-Type']) init.headers['Content-Type'] = 'application/json';
+    var res = await fetch(url, init);
+    var data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      var msg = (data && data.error) || ('请求失败（' + res.status + '）');
+      var err = new Error(msg);
+      err.status = res.status;
+      err.code = data && data.code;
+      throw err;
+    }
+    return data;
+  }
+
+  function setGenerateBusy(on){
+    state.generating = on;
+    $('#generate').disabled = on || state.op;
+    $('#generate').classList.toggle('busy', on);
+    $('#genText').textContent = on ? '正在挑歌…' : '生成歌单';
+    $('#brief').disabled = on;
+    var els = document.querySelectorAll('.sample, .counts .chip');
+    for (var i = 0; i < els.length; i++) els[i].disabled = on;
+  }
+  function setActionsDisabled(on){
+    state.op = on;
+    var ids = ['#swap', '#reorder', '#previewAll', '#saveLocal'];
+    ids.forEach(function(id){ var b = $(id); if (b) b.disabled = on; });
+    /* D8：写歌单接口验证通过前，账号保存按钮始终置灰 */
+    $('#saveAccount').disabled = true;
+    $('#generate').disabled = on || state.generating;
+    var rms = document.querySelectorAll('.rm');
+    for (var i = 0; i < rms.length; i++) rms[i].disabled = on;
+    $('#name').disabled = on;
+    if (state.items.length === 0) disableSave();
+  }
+  function disableSave(){
+    $('#saveAccount').disabled = true;
+    $('#saveLocal').disabled = true;
+  }
+
+  function currentBrief(){
+    return String($('#brief').value || '').trim();
+  }
+  function currentCount(){
+    return state.count;
+  }
+
+  /* ---------- generate ---------- */
+  async function generate(brief){
+    if (state.generating) return;
+    var text = String(brief === undefined ? currentBrief() : brief).trim();
+    if (!text) {
+      showError('先写一句场景，再生成歌单');
+      $('#brief').focus();
+      return;
+    }
+    state.brief = text;
+    state.lastFailed = text;
+    hideError();
+    setGenerateBusy(true);
+    try {
+      var data = await request('__BASE__/api/scene', {
+        method: 'POST',
+        body: JSON.stringify({ brief: text, count: currentCount() })
+      });
+      var draft = data && data.draft;
+      if (!draft) throw new Error('服务端没有返回草稿');
+      if (state.draft) state.prev = state.draft;
+      applyDraft(draft, true);
+    } catch (err) {
+      showError(err && err.message ? err.message : '生成失败，请重试');
+      if (!state.draft) { $('#empty').hidden = false; }
+    } finally {
+      setGenerateBusy(false);
+      updateSwap();
+    }
+  }
+
+  function applyDraft(draft, resetName){
+    state.draft = draft;
+    state.items = Array.isArray(draft.tracks) ? draft.tracks.slice() : [];
+    $('#empty').hidden = !!state.items.length || !!state.draft;
+    $('#result').hidden = false;
+    $('#sayText').textContent = draft.brief || state.brief || '（没有描述）';
+    renderFilters(draft.filters || {});
+    renderSources(draft);
+    updateListHeader();
+    renderList();
+    renderExcluded(draft);
+    if (resetName && !state.nameDirty) {
+      var suggested = (draft.brief || '场景歌单');
+      if (suggested.length > 20) suggested = suggested.slice(0, 20) + '…';
+      $('#name').value = suggested + ' · 歌单';
+    }
+    $('#saveTip').className = 'saveTip';
+    $('#saveTip').textContent = '';
+    updateSwap();
+    setActionsDisabled(false);
+    if (state.items.length === 0) disableSave();
+    else if (state.op) disableSave();
+  }
+
+  function renderFilters(filters){
+    var box = $('#filters');
+    box.textContent = '';
+    var chips = [];
+    var keywords = Array.isArray(filters.keywords) ? filters.keywords.filter(Boolean) : [];
+    keywords.forEach(function(k){ chips.push({ text: '关键词「' + k + '」' }); });
+    if (filters.language && filters.language !== 'all') {
+      chips.push({ text: '语言 ' + (LANG[filters.language] || filters.language) });
+    }
+    if (filters.band) chips.push({ text: '速度 ' + (BAND[filters.band] || filters.band) });
+    if (filters.minutes) chips.push({ text: '时长 ' + filters.minutes + ' 分钟左右' });
+    if (filters.quiet) chips.push({ text: '安静一点' });
+    if (!chips.length) { box.hidden = true; return; }
+    box.hidden = false;
+    chips.forEach(function(c){
+      var span = el('span', 'fchip', c.text);
+      box.appendChild(span);
+    });
+  }
+
+  function updateSwap(){
+    var btn = $('#swap');
+    if (!btn) return;
+    btn.textContent = state.prev && !state.generating ? '恢复上一批 · 换一批' : '换一批';
+    btn.title = state.prev ? '双态按钮：当前点会重新生成；恢复请用侧栏？' : '';
+    btn.disabled = state.generating || state.op;
+  }
+
+  function estimatedMinutes(items){
+    var ms = 0;
+    items.forEach(function(item){
+      var d = item && item.track && num(item.track.duration);
+      if (d > 0) ms += d;
+    });
+    if (!ms) return 0;
+    return Math.round(ms / 60000);
+  }
+
+  function updateListHeader(){
+    var n = state.items.length;
+    $('#draftTitle').textContent = '草稿 ' + n + ' 首';
+    var mins = estimatedMinutes(state.items);
+    $('#draftMeta').textContent = mins > 0 ? ('约 ' + mins + ' 分钟') : '';
+    $('#semantic').textContent = n > 0
+      ? '已按情绪过渡和 BPM 排过序，同类来源不连续堆叠；可以单首移除，也可以重排。'
+      : '这一份草稿被移空了，换一批或重新生成吧。';
+    if (n === 0) disableSave();
+  }
+
+  function coverNode(track){
+    var box = el('div', 'cover');
+    if (track && track.picUrl) {
+      var img = document.createElement('img');
+      img.alt = '';
+      img.loading = 'lazy';
+      img.src = track.picUrl;
+      img.addEventListener('error', function(){ img.remove(); });
+      box.appendChild(img);
+    }
+    return box;
+  }
+
+  function whyChips(item){
+    var box = el('div', 'why');
+    if (item.reason) box.appendChild(el('span', 'w reason', item.reason));
+    if (item.bpm) box.appendChild(el('span', 'w', 'BPM ' + Math.round(num(item.bpm))));
+    if (item.language) {
+      var lang = LANG[item.language] || item.language;
+      if (lang) box.appendChild(el('span', 'w', lang));
+    }
+    return box;
+  }
+
+  function renderList(){
+    var box = $('#list');
+    box.textContent = '';
+    if (!state.items.length) {
+      var empty = el('div', 'dempty');
+      empty.appendChild(document.createTextNode('候选池里暂时没有挑到合适的歌。把场景说宽一点，或者换一批。'));
+      empty.appendChild(document.createElement('br'));
+      var again = el('button', 'ghostbtn', '换一批');
+      again.type = 'button';
+      again.addEventListener('click', function(){ generate(); });
+      empty.appendChild(again);
+      box.appendChild(empty);
+      return;
+    }
+    state.items.forEach(function(item, i){
+      var row = el('div', 'drow');
+      row.appendChild(el('span', 'ix', String(i + 1)));
+      var track = item.track || {};
+      row.appendChild(coverNode(track));
+      var meta = el('div', 'dmeta');
+      meta.appendChild(el('div', 'dname', track.name || '未知歌曲'));
+      var artists = Array.isArray(track.artists) ? track.artists.filter(Boolean).join(' / ') : '';
+      var subline = artists || '未知艺人';
+      if (track.album) subline += ' · ' + track.album;
+      meta.appendChild(el('div', 'dsub', subline));
+      meta.appendChild(whyChips(item));
+      row.appendChild(meta);
+      var rm = el('button', 'rm', '✕');
+      rm.type = 'button';
+      rm.title = '从草稿里移除';
+      rm.setAttribute('aria-label', '移除 ' + (track.name || '这首歌'));
+      rm.addEventListener('click', function(){ removeItem(i); });
+      row.appendChild(rm);
+      box.appendChild(row);
+    });
+  }
+
+  function removeItem(index){
+    if (state.op || state.generating) return;
+    var item = state.items[index];
+    if (!item) return;
+    state.items.splice(index, 1);
+    updateListHeader();
+    renderList();
+    renderSources(state.draft);
+    if (state.items.length === 0) {
+      disableSave();
+      $('#saveTip').className = 'saveTip';
+      $('#saveTip').textContent = '';
+    }
+    var name = item.track && item.track.name ? item.track.name : '这首歌';
+    toast('已从草稿移除《' + name + '》');
+  }
+
+  function renderSources(draft){
+    var box = $('#sources');
+    box.textContent = '';
+    $('#poolNote').textContent = '候选池 ' + fmt(num(draft.poolSize)) + ' 首';
+    var list = Array.isArray(draft.bySource) ? draft.bySource.slice() : [];
+    list = list.filter(function(s){ return s && num(s.count) > 0; });
+    if (!list.length) {
+      box.appendChild(el('div', 'hint', '这一份没有来源统计。'));
+      return;
+    }
+    list.sort(function(a, b){ return num(b.weight) - num(a.weight); });
+    list.forEach(function(s, i){
+      var def = SOURCE[s.key] || { label: s.key || '其他', color: 'var(--g4)' };
+      var row = el('div', 'src-row');
+      var dot = el('span', 'dot');
+      dot.style.background = i === 0 ? 'var(--red)' : (def.color === 'var(--red)' ? 'var(--g2)' : def.color);
+      row.appendChild(dot);
+      row.appendChild(el('span', 'nm', def.label));
+      row.appendChild(el('span', 'ct', fmt(num(s.count)) + ' 首'));
+      row.appendChild(el('span', 'wt', '权重 ' + fmt(num(s.weight))));
+      box.appendChild(row);
+    });
+    var warnings = Array.isArray(draft.warnings) ? draft.warnings.filter(Boolean) : [];
+    if (warnings.length) {
+      var note = el('div', 'hint', warnings.join('；'));
+      note.style.color = '#f0c3c4';
+      note.style.marginTop = '10px';
+      box.appendChild(note);
+    }
+  }
+
+  function renderExcluded(draft){
+    var box = $('#excluded');
+    box.textContent = '';
+    var ex = draft.excluded || {};
+    var disliked = fmt(num(ex.disliked));
+    var recent = fmt(num(ex.recent));
+    box.appendChild(document.createTextNode('已排除 '));
+    box.appendChild(el('b', null, disliked));
+    box.appendChild(document.createTextNode(' 首你跳过过的、'));
+    box.appendChild(el('b', null, recent));
+    box.appendChild(document.createTextNode(' 首最近听过的。'));
+    box.appendChild(document.createElement('br'));
+    box.appendChild(document.createTextNode('来源权重由高到低参与打分，分数高不等于一定会出现。'));
+  }
+
+  /* ---------- ops ---------- */
+  async function reorder(){
+    if (state.op || state.generating || state.items.length < 2) return;
+    state.items.sort(function(a, b){
+      var ba = a && a.bpm !== null && a.bpm !== undefined ? num(a.bpm) : 1000;
+      var bb = b && b.bpm !== null && b.bpm !== undefined ? num(b.bpm) : 1000;
+      return ba - bb;
+    });
+    renderList();
+    updateListHeader();
+    toast('已按 BPM 从慢到快重排');
+  }
+
+  async function previewAll(){
+    if (state.op || state.generating) return;
+    if (!state.items.length) { showError('草稿是空的，先挑几首再试听'); return; }
+    hideError();
+    setActionsDisabled(true);
+    try {
+      var ids = state.items.map(function(item){ return item.track && item.track.id; }).filter(function(id){ return id !== undefined && id !== null; });
+      var data = await request('__BASE__/api/scene/preview', {
+        method: 'POST',
+        body: JSON.stringify({ trackIds: ids })
+      });
+      var count = data && data.count !== undefined ? data.count : ids.length;
+      toast('已加入临时队列，共 ' + fmt(num(count)) + ' 首');
+    } catch (err) {
+      showError(err && err.message ? err.message : '试听失败，请重试');
+    } finally {
+      setActionsDisabled(false);
+    }
+  }
+
+  function trackIds(){
+    return state.items.map(function(item){ return item.track && item.track.id; }).filter(function(id){ return id !== undefined && id !== null; });
+  }
+
+  async function save(mode){
+    if (state.op || state.generating) return;
+    if (!state.items.length) { showError('草稿是空的，先挑几首再保存'); return; }
+    var name = String($('#name').value || '').trim();
+    if (!name) { showError('先给歌单起个名字'); $('#name').focus(); return; }
+    hideError();
+    var tip = $('#saveTip');
+    tip.className = 'saveTip';
+    tip.textContent = '';
+    setActionsDisabled(true);
+    try {
+      var data = await request('__BASE__/api/scene/save', {
+        method: 'POST',
+        body: JSON.stringify({ name: name, trackIds: trackIds(), mode: mode })
+      });
+      renderSaved(data || {}, mode);
+    } catch (err) {
+      if (mode === 'account' && (err.status === 501 || err.code === 'UNVERIFIED')) {
+        tip.className = 'saveTip warn';
+        tip.textContent = '写歌单还没验证，已只存本地。';
+        await saveLocalAfterUnverified(name);
+      } else {
+        showError(err && err.message ? err.message : '保存失败，请重试');
+      }
+    } finally {
+      setActionsDisabled(false);
+    }
+  }
+
+  async function saveLocalAfterUnverified(name){
+    try {
+      var data = await request('__BASE__/api/scene/save', {
+        method: 'POST',
+        body: JSON.stringify({ name: name, trackIds: trackIds(), mode: 'local' })
+      });
+      renderSaved(data || {}, 'local');
+    } catch (err) {
+      showError(err && err.message ? err.message : '本地保存也失败了，请重试');
+    }
+  }
+
+  function renderSaved(data, mode){
+    var tip = $('#saveTip');
+    var count = data.count !== undefined ? fmt(num(data.count)) : fmt(state.items.length);
+    tip.className = 'saveTip ok';
+    tip.textContent = mode === 'local'
+      ? ('已只存本地《' + (data.name || $('#name').value) + '》· ' + count + ' 首')
+      : ('已存到你的网易云歌单《' + (data.name || $('#name').value) + '》· ' + count + ' 首');
+    toast(mode === 'local' ? '已只存本地' : '已存到你的歌单');
+  }
+
+  /* ---------- events ---------- */
+  (function bind(){
+    $('#generate').addEventListener('click', function(){ generate(); });
+    $('#brief').addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter') { ev.preventDefault(); generate(); }
+    });
+    $('#brief').addEventListener('input', function(){
+      if (!$('#error').hidden) hideError();
+    });
+    $('#retry').addEventListener('click', function(){
+      if (state.lastFailed) generate(state.lastFailed);
+    });
+
+    document.querySelector('.composer').addEventListener('click', function(ev){
+      var sample = ev.target.closest('.sample');
+      if (sample && !sample.disabled) {
+        var text = sample.getAttribute('data-brief') || '';
+        $('#brief').value = text;
+        generate(text);
+        return;
+      }
+      var chip = ev.target.closest('[data-count]');
+      if (chip && !chip.disabled) {
+        state.count = Number(chip.getAttribute('data-count')) || 25;
+        var chips = document.querySelectorAll('.counts .chip');
+        for (var i = 0; i < chips.length; i++) chips[i].classList.toggle('on', Number(chips[i].getAttribute('data-count')) === state.count);
+      }
+    });
+
+    document.querySelector('.empty').addEventListener('click', function(ev){
+      var sample = ev.target.closest('.sample');
+      if (!sample) return;
+      var text = sample.getAttribute('data-brief') || '';
+      $('#brief').value = text;
+      generate(text);
+    });
+
+    $('#swap').addEventListener('click', function(){
+      if (state.generating || state.op) return;
+      generate(state.brief || currentBrief());
+    });
+
+    $('#reorder').addEventListener('click', reorder);
+    $('#previewAll').addEventListener('click', previewAll);
+    $('#saveAccount').addEventListener('click', function(){ save('account'); });
+    $('#saveLocal').addEventListener('click', function(){ save('local'); });
+    $('#name').addEventListener('input', function(){ state.nameDirty = true; });
+  })();
+
+  setActionsDisabled(false);
+
+  /* 深链：?brief=…&count=… 预填并自动生成一次（聊天/工具可直接给链接） */
+  (function deepLink(){
+    var params = new URLSearchParams(window.location.search);
+    var count = Number(params.get('count'));
+    if (isFinite(count) && count >= 5) {
+      state.count = Math.min(60, Math.round(count));
+      var chips = document.querySelectorAll('.counts .chip');
+      for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.toggle('on', Number(chips[i].getAttribute('data-count')) === state.count);
+      }
+    }
+    var brief = params.get('brief');
+    if (!brief) return;
+    var text = String(brief).trim();
+    if (!text) return;
+    $('#brief').value = text;
+    generate(text);
+  })();
+})();
+</script>
+</body>
+</html>

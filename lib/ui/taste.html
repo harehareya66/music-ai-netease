@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的口味画像 · 网易云音乐</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
+    --text:#E8EAED; --muted:#8B909A; --red:#E5484D; --teal:#2FB3A6;
+    /* 图表类别灰阶：按序取，只有"峰值/第一名"才用 --red */
+    --g1:#8B909A; --g2:#5A6070; --g3:#3A3F4A;
+    --r-sm:8px; --r:14px; --r-lg:20px;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:26px 32px 34px;
+  }
+  [hidden]{ display:none !important; }
+  a{ color:inherit; text-decoration:none; }
+  button{ font-family:inherit; }
+  .page{ width:100%; }
+
+  /* ---------- top ---------- */
+  .top{ display:flex; align-items:center; gap:14px; margin-bottom:22px; min-height:34px; }
+  .back{
+    width:30px; height:30px; flex:0 0 30px; border-radius:8px; border:1px solid var(--line);
+    display:grid; place-items:center; color:var(--muted); background:var(--card);
+    transition:color .15s, border-color .15s;
+  }
+  .back:hover{ color:var(--text); border-color:#39404d; }
+  .back svg{ width:16px; height:16px; display:block; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  h1{ font-size:21px; font-weight:600; margin:0; letter-spacing:.4px; }
+  .sub{ font-size:12.5px; color:var(--muted); margin-left:2px; }
+  .chips{ margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .chip{
+    height:32px; padding:0 14px; border-radius:20px; border:1px solid var(--line);
+    background:#13161C; display:inline-flex; align-items:center; justify-content:center;
+    font-size:12.5px; color:#A9AEB8; cursor:pointer; white-space:nowrap;
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover:not(:disabled){ color:var(--text); border-color:#39404d; }
+  .chip.on{ background:var(--red); border-color:var(--red); color:#fff; font-weight:600; }
+  .chip:disabled{ cursor:default; opacity:.55; }
+
+  /* ---------- shared ---------- */
+  .card{ border:1px solid var(--line); border-radius:var(--r); background:var(--card); }
+  .chart{ padding:18px 20px 16px; min-width:0; }
+  .chart h3{ margin:0 0 4px; font-size:13.5px; font-weight:600; }
+  .chart .hint{ font-size:11.5px; color:var(--muted); }
+  .err-inline{ margin-top:10px; font-size:11.5px; color:#e0a6a8; }
+
+  /* summary */
+  .summary{
+    display:flex; align-items:center; gap:34px; padding:22px 24px; margin-bottom:16px;
+    background:linear-gradient(100deg,rgba(229,72,77,.13),rgba(23,26,32,.2) 46%,rgba(23,26,32,.2));
+  }
+  .summary .big{ font-size:19px; font-weight:600; line-height:1.55; letter-spacing:.3px; flex:1; min-width:0; }
+  .summary .big i{ font-style:normal; color:#FF9EA1; }
+  .tags{ display:flex; gap:9px; flex:none; flex-wrap:wrap; }
+  .tag{
+    height:28px; padding:0 12px; border-radius:8px;
+    background:rgba(229,72,77,.10); border:1px solid rgba(229,72,77,.32);
+    color:#F2A2A5; font-size:12.5px; display:inline-flex; align-items:center;
+  }
+
+  /* row 1 */
+  .grid3{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:16px; }
+
+  /* donut */
+  .donutWrap{ display:flex; align-items:center; gap:22px; margin-top:14px; }
+  .donut{
+    width:144px; height:144px; border-radius:50%; flex:none; position:relative;
+    background:conic-gradient(#2B303A 0 100%);
+  }
+  .donut:after{ content:""; position:absolute; inset:35px; border-radius:50%; background:var(--card); }
+  .donut .mid{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2; }
+  .donut .mid b{ font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.15; max-width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .donut .mid span{ font-size:10.5px; color:var(--muted); display:block; text-align:center; margin-top:1px; }
+  .legend{ display:flex; flex-direction:column; gap:9px; font-size:12.5px; color:#B7BCC6; min-width:0; }
+  .legend .lrow{ display:flex; align-items:center; white-space:nowrap; }
+  .legend i{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:8px; flex:none; }
+  .legend .lname{ overflow:hidden; text-overflow:ellipsis; max-width:88px; }
+  .legend b{ margin-left:8px; color:var(--text); font-variant-numeric:tabular-nums; font-weight:500; }
+
+  /* era bars */
+  .bars{ display:flex; align-items:flex-end; gap:14px; height:122px; margin-top:18px; padding:0 4px; }
+  .bcol{ flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; gap:8px; }
+  .bcol .v{ font-size:11px; color:#B7BCC6; font-variant-numeric:tabular-nums; line-height:1; }
+  .bcol .b{
+    width:100%; max-width:48px; border-radius:6px 6px 3px 3px;
+    background:linear-gradient(180deg,#4A4F5C,#2A2E38);
+    transition:height .35s ease;
+  }
+  .bcol .b.hot{ background:linear-gradient(180deg,#E5484D,#8E2B33); }
+  .bcol .x{ font-size:11px; color:var(--muted); white-space:nowrap; line-height:1; }
+  .chart-empty{ margin-top:18px; padding:22px 10px; border:1px dashed var(--line); border-radius:var(--r-sm); text-align:center; font-size:11.5px; color:var(--muted); }
+
+  /* hbars */
+  .hbars{ margin-top:18px; display:flex; flex-direction:column; gap:13px; }
+  .hb{ display:flex; align-items:center; gap:10px; font-size:12px; color:#B7BCC6; }
+  .hb .lab{ width:46px; flex:none; }
+  .hb .track{ flex:1; height:8px; border-radius:6px; background:#22262E; overflow:hidden; }
+  .hb .track i{ display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,#4A4F5C,#2A2E38); transition:width .35s ease; }
+  .hb .track i.hot{ background:linear-gradient(90deg,#E5484D,#8E2B33); }
+  .hb .pct{ width:34px; text-align:right; color:var(--text); font-variant-numeric:tabular-nums; }
+
+  /* row 2 */
+  .grid2{ display:grid; grid-template-columns:1.05fr 1fr; gap:16px; margin-bottom:16px; }
+  .artists{ padding:18px 20px; }
+  .arow{ display:flex; align-items:center; gap:12px; padding:8px 0; font-size:13px; border-bottom:1px solid rgba(38,42,51,.55); }
+  .arow:last-child{ border-bottom:0; }
+  .arow .rk{ width:14px; flex:0 0 14px; color:#6E7480; font-variant-numeric:tabular-nums; font-size:12px; }
+  .arow .av{ width:30px; height:30px; border-radius:50%; flex:none; border:1px solid rgba(255,255,255,.05); }
+  .a1{ background:linear-gradient(135deg,#3A5068,#18222E); } .a2{ background:linear-gradient(135deg,#5B2A3A,#22141A); }
+  .a3{ background:linear-gradient(135deg,#2E4B42,#14201C); } .a4{ background:linear-gradient(135deg,#4A3A22,#1F1810); }
+  .a5{ background:linear-gradient(135deg,#33305E,#191727); }
+  .arow .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .arow .cnt{ color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; flex:none; }
+  .cloud{ padding:18px 20px; }
+  .cloud .cw{ display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; align-items:center; }
+  .cw span{ border-radius:8px; background:#1E222A; border:1px solid #2B303A; color:#B7BCC6; padding:4px 10px; line-height:1.35; cursor:default; }
+  .cw span.hot{ color:#FFB3B5; border-color:rgba(229,72,77,.42); background:rgba(229,72,77,.1); }
+
+  /* stats */
+  .stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .stat{ padding:16px 20px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .stat b{ font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.2; }
+  .stat .k{ font-size:12.5px; color:var(--muted); }
+  .stat .up{ color:var(--muted); font-size:11.5px; margin-left:auto; white-space:nowrap; }
+  .stat .up.good{ color:var(--teal); }
+
+  /* ---------- states ---------- */
+  .loading{ padding:64px 0; display:flex; flex-direction:column; align-items:center; gap:14px; color:var(--muted); font-size:12.5px; }
+  .spinner{ width:22px; height:22px; border-radius:50%; border:2px solid #2b303a; border-top-color:var(--red); animation:spin .9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .errorbar{
+    display:flex; align-items:center; gap:12px; margin-bottom:16px; padding:10px 12px 10px 14px;
+    border:1px solid rgba(229,72,77,.4); background:rgba(229,72,77,.09); border-radius:10px;
+    font-size:12.5px; color:#f3c4c6;
+  }
+  .errorbar .msg{ min-width:0; flex:1; }
+  .errorbar button{
+    flex:0 0 auto; height:26px; padding:0 12px; border-radius:8px; cursor:pointer;
+    border:1px solid rgba(229,72,77,.45); background:rgba(229,72,77,.16); color:#ffd9da; font-size:12px;
+  }
+  .errorbar button:hover{ background:rgba(229,72,77,.24); }
+  .empty{ padding:56px 24px; text-align:center; border:1px solid var(--line); border-radius:var(--r-lg); background:var(--card); }
+  .empty .glyph{ width:52px; height:52px; margin:0 auto 16px; border-radius:50%; display:grid; place-items:center; border:1px solid var(--line); color:var(--muted); font-size:20px; background:#1b1f27; }
+  .empty h2{ margin:0; font-size:16px; font-weight:600; }
+  .empty p{ margin:8px auto 20px; max-width:420px; font-size:12.5px; color:var(--muted); line-height:1.8; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 18px;
+    border-radius:9px; font-size:12.5px; cursor:pointer; border:1px solid var(--line);
+    background:#1d2129; color:var(--text);
+  }
+  .btn:hover{ background:#232833; border-color:#39404d; }
+  .btn.primary{ background:var(--red); border-color:var(--red); color:#fff; }
+  .btn.primary:hover{ background:#ef5559; border-color:#ef5559; }
+  .foot{ margin-top:22px; text-align:center; font-size:11px; color:#666c78; letter-spacing:.2px; line-height:1.9; }
+  .toast{
+    position:fixed; left:50%; bottom:34px; transform:translateX(-50%); z-index:50;
+    padding:9px 16px; border-radius:10px; font-size:12.5px; color:var(--text);
+    background:#232833; border:1px solid #333a46; box-shadow:0 10px 30px rgba(0,0,0,.45);
+    animation:tin .18s ease both;
+  }
+  @keyframes tin{ from{ opacity:0; transform:translate(-50%,6px); } to{ opacity:1; transform:translate(-50%,0); } }
+
+  @media (max-width:1120px){
+    body{ padding:20px 20px 32px; }
+    .grid3,.grid2,.stats{ grid-template-columns:minmax(0,1fr); }
+    .top{ flex-wrap:wrap; }
+    .chips{ margin-left:0; flex-wrap:wrap; }
+    .sub{ margin-left:0; }
+    .summary{ flex-wrap:wrap; gap:16px; }
+    .tags{ flex-wrap:wrap; }
+    .donutWrap{ gap:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <a class="back" href="__BASE__/panel" title="返回面板" aria-label="返回面板">
+      <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+    </a>
+    <h1>我的口味画像</h1>
+    <div class="sub" id="sub">数据来源：本机播放历史</div>
+    <div class="chips" id="ranges">
+      <button class="chip" type="button" data-range="4w">近 4 周</button>
+      <button class="chip" type="button" data-range="6m">近半年</button>
+      <button class="chip" type="button" data-range="all">全部</button>
+      <button class="chip" type="button" id="refresh">刷新</button>
+    </div>
+  </header>
+
+  <div id="error" class="errorbar" role="alert" hidden>
+    <span class="msg" id="errorMsg"></span>
+    <button type="button" id="retry">重试</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <span id="loadingText">正在把你的听歌记录算成画像…</span>
+  </div>
+
+  <main id="content" hidden>
+    <section class="card summary" aria-label="一句话总结">
+      <div class="big" id="summaryLine"></div>
+      <div class="tags" id="summaryTags"></div>
+    </section>
+
+    <div class="grid3">
+      <section class="card chart" aria-label="语言分布">
+        <h3>语言分布</h3><div class="hint">按曲目占比</div>
+        <div class="donutWrap">
+          <div class="donut" id="donut"><div class="mid"><b id="donutValue">—</b><span id="donutLabel">暂无</span></div></div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </section>
+
+      <section class="card chart" aria-label="年代分布">
+        <h3>年代分布</h3><div class="hint">按发行年份</div>
+        <div class="bars" id="era"></div>
+      </section>
+
+      <section class="card chart" aria-label="节奏分布">
+        <h3>节奏分布</h3><div class="hint">按 BPM 分档</div>
+        <div class="hbars" id="bpm"></div>
+        <div class="hint" id="bpmNote" style="margin-top:12px"></div>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="card artists" aria-label="最常听的艺人">
+        <h3 style="margin:0 0 4px;font-size:13.5px;font-weight:600">最常听的艺人</h3>
+        <div class="hint" id="artistHint" style="font-size:11.5px;color:var(--muted)">按播放次数</div>
+        <div id="artists"></div>
+      </section>
+
+      <section class="card cloud" aria-label="情绪与场景">
+        <h3 style="margin:0 0 4px;font-size:13.5px;font-weight:600">情绪与场景</h3>
+        <div class="hint" style="font-size:11.5px;color:var(--muted)">从你常听的歌的标签里长出来的</div>
+        <div class="cw" id="cloud"></div>
+      </section>
+    </div>
+
+    <div class="stats">
+      <div class="card stat">
+        <b id="statNew">—</b><span class="k">新歌率</span><span class="up" id="statNewDelta"></span>
+      </div>
+      <div class="card stat">
+        <b id="statRepeat">—</b><span class="k">重复播放</span><span class="up" id="statRepeatDelta"></span>
+      </div>
+      <div class="card stat">
+        <b id="statBpm">—</b><span class="k">平均 BPM</span><span class="up" id="statBpmDelta"></span>
+      </div>
+    </div>
+
+    <div class="foot">画像在本机生成 · 不上传账号信息</div>
+  </main>
+
+  <section class="empty" id="empty" hidden>
+    <div class="glyph">◎</div>
+    <h2>还没有足够的数据</h2>
+    <p>这段时间几乎没听到歌。先去面板放几首，口味画像需要一点播放记录才能长出来。</p>
+    <a class="btn primary" href="__BASE__/panel">去听歌</a>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var RANGES = { '4w':'近 4 周', '6m':'近半年', 'all':'全部' };
+  var COLORS = ['var(--red)', 'var(--g1)', 'var(--g2)', 'var(--g3)'];
+  var state = { range:'4w', profile:null, loading:false };
+
+  function $(sel, root){ return (root || document).querySelector(sel); }
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+  function num(v){ return typeof v === 'number' && isFinite(v) ? v : 0; }
+  function fmt(v){
+    var n = typeof v === 'number' && isFinite(v) ? v : 0;
+    return String(Math.round(n * 10) / 10);
+  }
+  function pct(v){ return fmt(num(v)); }
+  function isEmptyProfile(p){ return !p || !p.metrics || num(p.metrics.plays) === 0; }
+
+  var toastTimer = null;
+  function toast(msg){
+    var t = $('#toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.hidden = true; }, 2800);
+  }
+
+  function setBusy(on){
+    state.loading = on;
+    var btns = document.querySelectorAll('#ranges [data-range], #refresh');
+    for (var i = 0; i < btns.length; i++) btns[i].disabled = on;
+  }
+  function showError(msg){
+    $('#errorMsg').textContent = msg || '加载失败，请重试';
+    $('#error').hidden = false;
+  }
+  function hideError(){ $('#error').hidden = true; }
+
+  async function request(url, options){
+    var init = options || {};
+    init.headers = Object.assign({}, init.headers || {});
+    if (init.body && !init.headers['Content-Type']) init.headers['Content-Type'] = 'application/json';
+    var res = await fetch(url, init);
+    var data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      var msg = (data && data.error) || ('请求失败（' + res.status + '）');
+      var err = new Error(msg);
+      err.status = res.status;
+      err.code = data && data.code;
+      throw err;
+    }
+    return data;
+  }
+
+  async function load(range, opts){
+    opts = opts || {};
+    if (state.loading) return;
+    hideError();
+    setBusy(true);
+    $('#loadingText').textContent = opts.refresh ? '正在重新计算画像…' : '正在把你的听歌记录算成画像…';
+    if (!state.profile) $('#loading').hidden = false;
+    try {
+      var qs = new URLSearchParams();
+      qs.set('range', range);
+      if (opts.refresh) qs.set('refresh', '1');
+      var data = await request('__BASE__/api/taste?' + qs.toString());
+      var profile = data && data.profile;
+      if (!profile) throw new Error('服务端没有返回画像数据');
+      state.profile = profile;
+      render(profile);
+      if (opts.refresh) toast('画像已更新');
+    } catch (err) {
+      showError(err && err.message ? err.message : '加载失败，请重试');
+      if (!state.profile) $('#loading').hidden = true;
+    } finally {
+      setBusy(false);
+      $('#loading').hidden = true;
+    }
+  }
+
+  function renderDataSource(ds){
+    var node = $('#sub');
+    node.textContent = '';
+    var data = ds && typeof ds === 'object' ? ds : null;
+    var label = data && data.label ? data.label : '本机播放历史';
+    node.appendChild(document.createTextNode('数据来源：' + label));
+    if (data && data.note) node.appendChild(document.createTextNode('（' + data.note + '）'));
+  }
+
+  function render(p){
+    $('#loading').hidden = true;
+    renderDataSource(p.dataSource || p.source);
+    if (isEmptyProfile(p)) {
+      $('#content').hidden = true;
+      $('#empty').hidden = false;
+      return;
+    }
+    $('#empty').hidden = true;
+    $('#content').hidden = false;
+
+    var line = $('#summaryLine');
+    line.textContent = '';
+    highlight(line, p.summary || '这段时间的听歌记录还很少，多听几首再来看看。');
+    var tagsBox = $('#summaryTags');
+    tagsBox.textContent = '';
+    var tags = Array.isArray(p.tags) ? p.tags.slice(0, 6) : [];
+    tags.forEach(function(t){
+      if (!t || !t.label) return;
+      tagsBox.appendChild(el('div', 'tag', t.label));
+    });
+    tagsBox.hidden = !tagsBox.childNodes.length;
+
+    renderLanguage(p);
+    renderEra(p);
+    renderBpm(p);
+    renderArtists(p);
+    renderCloud(p);
+    renderStats(p);
+  }
+
+  function highlight(host, text){
+    var WORDS = ['慢速','中速','快速','华语','英文','日系','深夜','新歌率','单曲循环'];
+    var re = new RegExp('(' + WORDS.join('|') + ')', 'g');
+    var parts = String(text).split(re);
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      if (WORDS.indexOf(parts[i]) >= 0) host.appendChild(el('i', null, parts[i]));
+      else host.appendChild(document.createTextNode(parts[i]));
+    }
+  }
+
+  function renderLanguage(p){
+    var legend = $('#legend');
+    legend.textContent = '';
+    var list = (p.buckets && Array.isArray(p.buckets.language)) ? p.buckets.language.slice() : [];
+    list = list.filter(function(x){ return x && num(x.count) > 0; });
+    if (!list.length) {
+      $('#donut').style.background = 'conic-gradient(#2B303A 0 100%)';
+      $('#donutValue').textContent = '—';
+      $('#donutLabel').textContent = '暂无';
+      legend.appendChild(el('div', 'hint', '语言标签还没补齐。'));
+      return;
+    }
+    list.sort(function(a, b){ return num(b.count) - num(a.count); });
+    var top = list.slice(0, 3).map(function(x){
+      return { label: x.label || x.key || '未标注', count: num(x.count), pct: num(x.pct) };
+    });
+    var restCount = 0, restPct = 0;
+    for (var i = 3; i < list.length; i++) { restCount += num(list[i].count); restPct += num(list[i].pct); }
+    var entries = top.slice();
+    if (restCount > 0) entries.push({ label: '其他', count: restCount, pct: restPct });
+
+    var totalPct = 0;
+    entries.forEach(function(e){ totalPct += e.pct; });
+    var stops = [];
+    var acc = 0;
+    entries.forEach(function(e, idx){
+      var share = totalPct > 0 ? (e.pct / totalPct) * 100 : (100 / entries.length);
+      var from = acc;
+      acc = idx === entries.length - 1 ? 100 : Math.min(100, acc + share);
+      stops.push(COLORS[Math.min(idx, COLORS.length - 1)] + ' ' + (Math.round(from * 100) / 100) + '% ' + (Math.round(acc * 100) / 100) + '%');
+    });
+    $('#donut').style.background = 'conic-gradient(' + stops.join(',') + ')';
+    $('#donutValue').textContent = entries[0].label;
+    $('#donutLabel').textContent = '占 ' + pct(entries[0].pct) + '%';
+
+    entries.forEach(function(e, idx){
+      var row = el('div', 'lrow');
+      var dot = el('i');
+      dot.style.background = COLORS[Math.min(idx, COLORS.length - 1)];
+      row.appendChild(dot);
+      row.appendChild(el('span', 'lname', e.label));
+      row.appendChild(el('b', null, pct(e.pct) + '%'));
+      row.title = e.label + ' · ' + Math.round(e.count) + ' 次';
+      legend.appendChild(row);
+    });
+  }
+
+  function renderEra(p){
+    var box = $('#era');
+    box.textContent = '';
+    var list = (p.buckets && Array.isArray(p.buckets.era)) ? p.buckets.era.slice() : [];
+    list = list.filter(function(x){ return x && num(x.count) > 0; });
+    if (!list.length) { box.appendChild(el('div', 'chart-empty', '年代信息还不够，暂时画不出分布。')); return; }
+    function eraYear(key){
+      var m = /(\d{4})/.exec(String(key || ''));
+      return m ? Number(m[1]) : -1;
+    }
+    list.sort(function(a, b){ return num(b.count) - num(a.count); });
+    list = list.slice(0, 5);
+    list.sort(function(a, b){ return eraYear(b.key) - eraYear(a.key); });
+    var maxPct = 0;
+    list.forEach(function(x){ maxPct = Math.max(maxPct, num(x.pct)); });
+    var hotIdx = -1;
+    list.forEach(function(x, i){ if (num(x.pct) === maxPct && hotIdx < 0) hotIdx = i; });
+    list.forEach(function(x, i){
+      var col = el('div', 'bcol');
+      col.appendChild(el('div', 'v', pct(x.pct) + '%'));
+      var bar = el('div', 'b' + (i === hotIdx ? ' hot' : ''));
+      var h = maxPct > 0 ? Math.max(4, Math.round((num(x.pct) / maxPct) * 78)) : 4;
+      bar.style.height = h + 'px';
+      bar.title = (x.key || '') + ' · ' + Math.round(num(x.count)) + ' 次';
+      col.appendChild(bar);
+      col.appendChild(el('div', 'x', x.key || '—'));
+      box.appendChild(col);
+    });
+  }
+
+  function renderBpm(p){
+    var box = $('#bpm');
+    box.textContent = '';
+    var list = (p.buckets && Array.isArray(p.buckets.bpm)) ? p.buckets.bpm.slice() : [];
+    list = list.filter(function(x){ return x && num(x.count) > 0; });
+    if (!list.length) { box.appendChild(el('div', 'chart-empty', '速度信息还不够。')); $('#bpmNote').textContent = ''; return; }
+    var maxPct = 0;
+    list.forEach(function(x){ maxPct = Math.max(maxPct, num(x.pct)); });
+    var hot = -1;
+    list.forEach(function(x, i){ if (num(x.pct) === maxPct && hot < 0) hot = i; });
+    list.forEach(function(x, i){
+      var row = el('div', 'hb');
+      row.appendChild(el('span', 'lab', x.label || x.key || '—'));
+      var track = el('span', 'track');
+      var fill = el('i', i === hot ? 'hot' : '');
+      fill.style.width = Math.max(3, Math.min(100, num(x.pct))) + '%';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('span', 'pct', pct(x.pct) + '%'));
+      row.title = (x.label || x.key) + ' · ' + Math.round(num(x.count)) + ' 次';
+      box.appendChild(row);
+    });
+
+    var avg = p.metrics && p.metrics.avgBpm;
+    var note = $('#bpmNote');
+    note.textContent = '';
+    if (avg !== null && avg !== undefined && isFinite(Number(avg))) {
+      var parts = ['平均 ' + Math.round(num(avg)) + ' BPM'];
+      var d = p.deltas || null;
+      if (!d) {
+        parts.push('暂无上一周期数据');
+      } else if (tooThin(p, 'bpm')) {
+        parts.push('上一周期数据不足，暂不对比');
+      } else if (d.avgBpm !== null && d.avgBpm !== undefined) {
+        var dv = num(d.avgBpm);
+        parts.push('比上一周期' + (Math.abs(dv) < 0.5 ? '持平' : (dv > 0 ? '快 ' + Math.round(Math.abs(dv)) : '慢 ' + Math.round(Math.abs(dv)))));
+      }
+      note.textContent = parts.join(' · ');
+    } else {
+      note.textContent = '平均 BPM 暂时算不出来';
+    }
+  }
+
+  function renderArtists(p){
+    var box = $('#artists');
+    box.textContent = '';
+    $('#artistHint').textContent = (RANGES[state.range] || '近 4 周') + ' · 按播放次数';
+    var list = Array.isArray(p.topArtists) ? p.topArtists.slice(0, 5) : [];
+    list = list.filter(function(a){ return a && a.name; });
+    if (!list.length) { box.appendChild(el('div', 'chart-empty', '还没有反复听的艺人。')); return; }
+    list.forEach(function(a, i){
+      var row = el('div', 'arow');
+      row.appendChild(el('span', 'rk', String(i + 1)));
+      row.appendChild(el('span', 'av a' + (i + 1)));
+      row.appendChild(el('span', 'nm', a.name));
+      row.appendChild(el('span', 'cnt', Math.round(num(a.count)) + ' 次'));
+      box.appendChild(row);
+    });
+  }
+
+  function renderCloud(p){
+    var box = $('#cloud');
+    box.textContent = '';
+    var tags = Array.isArray(p.tags) ? p.tags.slice() : [];
+    tags = tags.filter(function(t){ return t && t.label; });
+    if (!tags.length) { box.appendChild(el('div', 'chart-empty', '情绪标签还没长出来。')); return; }
+    tags.sort(function(a, b){ return num(b.count) - num(a.count); });
+    var max = num(tags[0].count) || 1;
+    tags.forEach(function(t, i){
+      var ratio = num(t.count) / max;
+      var size = 12.5 + ratio * 7.5;
+      var span = el('span', i < 2 && ratio > 0.6 ? 'hot' : '', t.label);
+      span.style.fontSize = (Math.round(size * 10) / 10) + 'px';
+      span.title = t.label + ' · ' + Math.round(num(t.count)) + ' 次';
+      box.appendChild(span);
+    });
+  }
+
+  /* 接口没有暴露上一周期播放条数：用"隐含上期值 + 幅度"守卫，
+     上一周期只剩个位数播放时，delta 会夸张到 -90%，此时不展示对比。 */
+  function tooThin(p, which){
+    var d = p.deltas;
+    var m = p.metrics || {};
+    if (!d) return false;
+    if (which === 'bpm') {
+      if (d.avgBpm === null || d.avgBpm === undefined) return false;
+      var impliedBpm = num(m.avgBpm) - num(d.avgBpm);
+      return impliedBpm < 30 || impliedBpm > 220 || Math.abs(num(d.avgBpm)) > 80;
+    }
+    var current = which === 'newRate' ? num(m.newRate) : num(m.repeatRate);
+    var delta = which === 'newRate' ? d.newRate : d.repeatRate;
+    if (delta === null || delta === undefined) return false;
+    var implied = current - num(delta);
+    return implied < 0 || implied > 100 || Math.abs(num(delta)) > 60;
+  }
+
+  function deltaText(node, value, suffix, opts){
+    opts = opts || {};
+    if (value === null || value === undefined || !isFinite(Number(value))) {
+      node.textContent = '暂无上一周期数据';
+      node.className = 'up';
+      return;
+    }
+    var v = Number(value);
+    if (Math.abs(v) < (opts.epsilon === undefined ? 0.05 : opts.epsilon)) {
+      node.textContent = '持平 比上一周期';
+      node.className = 'up';
+      return;
+    }
+    var up = v > 0;
+    node.textContent = (up ? '↑ ' : '↓ ') + '比上一周期 ' + (up ? '+' : '−') + fmt(Math.abs(v)) + suffix;
+    var positive = opts.goodWhen ? (opts.goodWhen === 'up' ? up : !up) : up;
+    node.className = 'up' + (positive ? ' good' : '');
+  }
+
+  function renderStats(p){
+    var m = p.metrics || {};
+    var d = p.deltas || null;
+
+    $('#statNew').textContent = pct(m.newRate) + '%';
+    $('#statRepeat').textContent = pct(m.repeatRate) + '%';
+    $('#statBpm').textContent = (m.avgBpm === null || m.avgBpm === undefined) ? '—' : String(Math.round(num(m.avgBpm)));
+
+    if (!d) {
+      deltaText($('#statNewDelta'), null, '%');
+      deltaText($('#statRepeatDelta'), null, '%');
+      deltaText($('#statBpmDelta'), null, '');
+      return;
+    }
+    if (tooThin(p, 'newRate')) thinLabel($('#statNewDelta'));
+    else deltaText($('#statNewDelta'), d.newRate, '%', { epsilon: 0.5, goodWhen: 'up' });
+
+    if (tooThin(p, 'repeatRate')) thinLabel($('#statRepeatDelta'));
+    else deltaText($('#statRepeatDelta'), d.repeatRate, '%', { epsilon: 0.5, goodWhen: 'up' });
+
+    if (tooThin(p, 'bpm')) thinLabel($('#statBpmDelta'));
+    else {
+      var bpm = d.avgBpm;
+      if (bpm === null || bpm === undefined) thinLabel($('#statBpmDelta'));
+      else deltaText($('#statBpmDelta'), bpm, '', { epsilon: 0.5, goodWhen: null });
+    }
+  }
+
+  function thinLabel(node){
+    node.textContent = '上一周期数据不足，暂不对比';
+    node.className = 'up';
+  }
+
+  /* ---------- events ---------- */
+  (function bind(){
+    $('#ranges').addEventListener('click', function(ev){
+      var btn = ev.target.closest('[data-range]');
+      if (!btn || state.loading) return;
+      var range = btn.getAttribute('data-range');
+      if (!RANGES[range] || range === state.range) return;
+      state.range = range;
+      updateRangeChips();
+      load(range, {});
+    });
+    $('#refresh').addEventListener('click', function(){
+      if (state.loading) return;
+      load(state.range, { refresh: true });
+    });
+    $('#retry').addEventListener('click', function(){
+      if (state.loading) return;
+      load(state.range, {});
+    });
+  })();
+
+  function updateRangeChips(){
+    var chips = document.querySelectorAll('#ranges [data-range]');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('on', chips[i].getAttribute('data-range') === state.range);
+    }
+  }
+
+  updateRangeChips();
+  load(state.range, {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>歌词二创 · 概念稿</title>
+<style>
+  :root{
+    --bg:#0F1115; --card:#171A20; --line:#262A33; --text:#E8EAED; --muted:#8B909A;
+    --red:#E5484D; --teal:#2FB3A6; --amber:#F5A524;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.5 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;padding:26px 32px 24px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+  .back{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+  .back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  h1{font-size:20px;font-weight:600;margin:0;letter-spacing:.3px}
+  h1 small{font-size:13px;font-weight:400;color:var(--muted);margin-left:10px}
+  .modes{margin-left:auto;display:flex;gap:8px}
+  .chip{height:30px;padding:0 12px;border-radius:8px;background:#1B1F26;border:1px solid #2B303A;color:#B7BCC6;
+        font-size:12.5px;display:grid;place-items:center}
+  .chip.on{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+  @media (max-width:1120px){
+    .grid{grid-template-columns:minmax(0,1fr)}
+    .modes{flex-wrap:wrap}
+    .bottom{flex-wrap:wrap}
+    .bottom .r{margin-left:0}
+  }
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--card);display:flex;flex-direction:column;min-height:0}
+  .hd{display:flex;align-items:center;gap:9px;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .hd b{font-size:13px}
+  .hd .hint{font-size:11.5px;color:var(--muted)}
+  .hd .badge{margin-left:auto;font-size:11px;color:#9FD8D0;background:rgba(47,179,166,.1);
+             border:1px solid rgba(47,179,166,.3);border-radius:20px;padding:2px 9px}
+  .body{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:2px}
+  .line{display:flex;gap:16px;padding:7px 8px;border-radius:8px}
+  .line .tm{width:44px;flex:none;font-size:11px;color:#5F6570;font-variant-numeric:tabular-nums;padding-top:3px}
+  .line .tx{font-size:15px;line-height:1.75;color:#C9CDD6}
+  .line.cur{background:rgba(229,72,77,.08)}
+  .line.cur .tx{color:#F3F4F6;font-weight:600}
+  .line.cur .tx em{font-style:normal;color:#FF8A8D}
+  .line.sel{background:rgba(47,179,166,.07);border:1px solid rgba(47,179,166,.18)}
+  .poem{padding:18px 20px;font-size:16px;line-height:2.1;color:#DDE1E7;letter-spacing:.4px}
+  .poem p{margin:0 0 2px}
+  .poem p.first{color:#FF9EA1}
+  .foot{display:flex;align-items:center;gap:10px;padding:13px 18px;border-top:1px solid var(--line)}
+  .foot .btn{height:32px;padding:0 14px;border-radius:8px;display:grid;place-items:center;font-size:12.5px;color:#C9CDD6;
+             border:1px solid var(--line);background:#13161C}
+  .foot .btn.primary{border:none;background:var(--red);color:#fff;font-weight:600;box-shadow:0 8px 18px -10px rgba(229,72,77,.9)}
+  .foot .note{margin-left:auto;font-size:11.5px;color:#5F6570}
+  .bottom{margin-top:16px;display:flex;align-items:center;gap:12px;padding:14px 18px;border:1px solid var(--line);
+          border-radius:14px;background:var(--card)}
+  .bottom .lab{font-size:12px;color:var(--muted)}
+  .bottom .r{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:11.5px;color:#5F6570}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <h1>夜航西飞 <small>陈粒 · 洄游 · 04:26</small></h1>
+    <div class="modes">
+      <div class="chip">翻译</div>
+      <div class="chip on">改写成诗</div>
+      <div class="chip">藏头</div>
+      <div class="chip">短视频文案</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="hd"><b>原词</b><span class="hint">逐字时间轴</span></div>
+      <div class="body">
+        <div class="line sel"><span class="tm">00:12</span><span class="tx">我听见风 从西边来</span></div>
+        <div class="line cur"><span class="tm">00:18</span><span class="tx">吹过你 <em>没说出口的那句</em></span></div>
+        <div class="line"><span class="tm">00:24</span><span class="tx">夜航的人 不看海</span></div>
+        <div class="line"><span class="tm">00:31</span><span class="tx">只看灯 一盏一盏地开</span></div>
+        <div class="line"><span class="tm">00:38</span><span class="tx">如果明天 还有明天</span></div>
+        <div class="line"><span class="tm">00:45</span><span class="tx">我就把今晚 折成船</span></div>
+        <div class="line"><span class="tm">00:52</span><span class="tx">顺着风 漂到你窗前</span></div>
+      </div>
+      <div class="foot"><div class="btn">改写选中的行</div><div class="note">已选 1 行</div></div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><b>改写成诗</b><span class="hint">保持原意，去掉口水词</span><span class="badge">DSH 模型生成 · 1.8s</span></div>
+      <div class="poem">
+        <p class="first">风从西边来的时候，</p>
+        <p>你没有把那句话说完。</p>
+        <p>夜航的人不看海，</p>
+        <p>只看灯，一盏一盏地，</p>
+        <p>替你把岸边点亮。</p>
+        <p>如果明天还有明天，</p>
+        <p>我就把今晚折成一只船。</p>
+      </div>
+      <div class="foot">
+        <div class="btn primary">重新生成</div>
+        <div class="btn">换个风格</div>
+        <div class="btn">存到本机笔记</div>
+        <div class="note">只写本机笔记 · 不进账号</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <span class="lab">改写范围</span>
+    <div class="chip on" style="height:28px">整首</div>
+    <div class="chip" style="height:28px">选中的行</div>
+    <div class="chip" style="height:28px">只改副歌</div>
+    <span class="r">只把歌词文本发给模型 · 不发送账号信息与 cookie</span>
+  </div>
+</body>
+</html>
