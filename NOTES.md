@@ -284,3 +284,30 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 3. 运行时加 `NODE_OPTIONS=--use-system-ca`，让 Node 信任系统证书（卡巴斯基根证书）。
 
 仓库：<https://github.com/harehareya66/music-ai-netease>（main）。最近一次同步 commit `d64edbe`，83 个文件。
+
+## 18. P0 预验结论（2026-10-23，六块优化的开工前置）
+
+三件事都验证过，结论写进 `PLAN.md` §6.5，这里存证据。
+
+### ① 壳的版本
+`ELECTRON_RUN_AS_NODE=1 "...\DeepSeek Harness.exe" -e "console.log(process.versions)"`：
+`electron 44.7.0 / chrome 152.0.7977.130 / node 24.21.0`；本机 Edge 155.0.4283.62。
+Document PiP 自 Chromium 116 起支持，API 在；Electron 是否真开原生窗口必须在渲染进程里点一次才能确定，headless Edge 不能当证据 → 留到 P5 首步实测，降级链路已在 PLAN §6.5 写明。
+
+### ② 主题
+`app.asar` 里 `@deepseek-ai/dsh-client-ui-theme` 的 README 明确：feature plugin 用 `ctx.theme` 拿快照（`preference` light/dark/system、resolved、`fontSizes`、`fontFamilies`、`revision`），变化走 `theme/change`；页面侧公开令牌前缀 `--dsw-*`。
+我们的 `lib/client.js` 现在 `inject = ['slots','locale']`，panel 是 `h('iframe',{src:panelUrl()})`，页面由插件 HTTP 服务提供 → **跨源 iframe 读不到父页 CSS 变量**，必须 client 侧读快照、压成 query 参数 + `postMessage`。定案见 PLAN §6.5。
+
+### ③ 周维度（探针 `%TEMP%\ncm-week-probe.mjs`，真实账号 uid 562295789）
+```
+type0+allData=true  => code 200, all 100 首, week 0
+type0+allData=false => code 200, all 100 首, week 0
+type1+allData=true  => code 200, week 100 首, 首条 真夜中のドア 14 次
+type0 only          => code 200, all 100 首, week 0
+/api/v1/play/record?uid=...        => 400 非 JSON
+/api/usertool/play/record?uid=...  => code 404
+```
+结论：**`type:1` 能拿到本周 100 条（带 playCount，无时间戳）**；`type:0` 拿全部累计。上一周没有端点。周报因此分两栏：本周榜单/次数优先账号，时长/每日/时段/上周对比只用本机历史，缺失就隐藏而不是显示 0。
+
+### 实施排期（用户已批，13 人天）
+P0 定案 ✅ → P1 设置与模型底座 2d → P2 二创 v2 2d → P3 AI DJ v2 2d / P4 周报修正 1d（可并行）→ P5 歌词与悬浮窗 2d → P6 安全页与静态检查 1.5d → P7 主题模板 1d → P8 回归发布 1d。
