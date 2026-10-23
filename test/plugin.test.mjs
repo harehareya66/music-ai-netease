@@ -123,6 +123,30 @@ test('serves the panel with feature navigation', async () => {
     assert.equal(res.status, 200);
     assert.match(res.body, /feature-nav/);
     assert.match(res.body, /画像/);
+    assert.match(res.body, /检查台/);
+  } finally {
+    plugin.dispose();
+  }
+});
+
+test('serves the maker console and its facts', async () => {
+  const plugin = mount();
+  try {
+    const page = await plugin.call('/music/dev');
+    assert.equal(page.status, 200);
+    assert.match(page.body, /制作者检查台/);
+
+    const res = await plugin.call('/music/api/dev');
+    assert.equal(res.status, 200);
+    const dev = res.json;
+    assert.equal(dev.ok, true);
+    assert.equal(dev.prefix, '/music');
+    assert.equal(dev.pages.includes('dev'), true);
+    assert.equal(Array.isArray(dev.tools), true);
+    assert.equal(dev.tools.length, 13);
+    assert.equal(typeof dev.session.history, 'number');
+    // No probe has run in a temp data dir yet, and that must not be an error.
+    assert.equal(dev.probe, null);
   } finally {
     plugin.dispose();
   }

@@ -690,6 +690,7 @@
         body: JSON.stringify({ trackIds: ids })
       });
       var count = data && data.count !== undefined ? data.count : ids.length;
+      // 不跳页：底部浮空岛显示正在播放，并接管播放/暂停/音量。
       toast('已加入临时队列，共 ' + fmt(num(count)) + ' 首');
     } catch (err) {
       showError(err && err.message ? err.message : '试听失败，请重试');
@@ -824,5 +825,6 @@
   })();
 })();
 </script>
+<script src="__BASE__/mini.js" defer></script>
 </body>
 </html>

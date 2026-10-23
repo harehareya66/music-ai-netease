@@ -28,11 +28,12 @@
 | 4 个页面路由 + API | ✅ | `lib/router.js`：`/music/taste|weekly|scene|lyric`、`api/taste|report|scene|lyric` |
 | 四页 HTML（`lib/ui/`） | ✅ | taste 672 / weekly 673 / scene 821 / lyric 834 行；1600 与 1100 两档截图验收 |
 | 面板中文 + 四入口 | ✅ | `lib/panel.html`：`detectLang()` 恒 `zh`；header `feature-nav`；1100 宽不溢出 |
-| 曲库页（登录后看歌单） | 🚧 | 服务端 `GET /music/api/library` 已通（真账号返回 created 47 / liked / collected 60 / recent 14 / daily 6）；页面 `lib/ui/library.html` 由 libbuilder 写 |
-| 端到端冒烟 | ✅ | `test/plugin.test.mjs`，`node --test` **37/37** |
-| M0 探针脚本 | ✅ | `scripts/probe.mjs`（只读默认，`--write` 才写账号） |
+| 曲库页（登录后看歌单） | ✅ | `lib/ui/library.html` + `GET /music/api/library`（真账号 created 47 / liked 4458 / collected 60 / recent 15 / daily 6）；未登录 401 空态；1100 单列 |
+| 制作者检查台 | ✅ | `/music/dev` + `GET /music/api/dev`：环境、探针结论、12 项功能自检、六页入口、人工清单 |
+| 端到端冒烟 | ✅ | `test/plugin.test.mjs`，`node --test` **38/38** |
+| M0 探针脚本 | ✅ | `scripts/probe.mjs`（只读默认，`--write` 才写账号）；结论写入 `<dataDir>/probe.json`，检查台直接读 |
 | 本地可复用测试数据 | ✅ | `scripts/fixture.mjs --out %TEMP%\ncm-demo`（213 条播放 / 20 首标签 / 1 条 dislike） |
-| 打包装备 | ✅ | `npm pack` → `ncm-plugin-0.1.0.tgz`（35 files，197 KB） |
+| 打包装备 | ✅ | `npm pack`（37 files 左右，含 `lib/ui/dev.html`） |
 
 跑测试与探针：
 
@@ -43,8 +44,10 @@ node scripts/preview.mjs --keep                              # 五屏本地预�
 node scripts/fixture.mjs --out "$env:TEMP\ncm-demo"          # 造演示数据
 node scripts/preview.mjs --data-dir "$env:TEMP\ncm-demo" --port 7789 --keep
 node scripts/probe.mjs                                       # 需先扫码登录；只读 + V2/V3 dry-run
-node scripts/probe.mjs --write                               # 真建一张临时歌单验 V2/V3
+node scripts/probe.mjs --write                               # 真建一张临时歌单验 V2/V3（验完自动删）
 ```
+
+装了 DSH 之后，检查台在侧栏音乐面板右上「检查台」，或直接开 `http://127.0.0.1:<port>/music/dev`。
 
 ## 0.2 H5 实测：登录成功但页面无内容（2026-10-22）
 
@@ -55,16 +58,32 @@ node scripts/probe.mjs --write                               # 真建一张临�
 - 处置：新增 `GET /music/api/library`（账号歌单三分组 + 最近播放 + 每日推荐，未登录 401 `NO_ACCOUNT`）、`lib/ui/library.html` 曲库页、面板 header 加「曲库」入口、未播放时显示「去曲库挑一张歌单 →」、扫码成功且没有在播时自动跳到曲库。
 - 另记：DSH GUI（端口 63734）的 `/music/health` 是 404——**插件还没装进 desktop profile**，H5 测试目前跑的是 `scripts/preview.mjs`（7789），不是 DSH 本体。
 
+## 0.3 制作者检查台（2026-10-23）
+
+给开发验收用的页面，`GET /music/dev`（数据来自 `GET /music/api/dev`，都是只读；自检会真的打接口，但只打读接口，唯一有副作用的是场景草稿——它只读候选池，不写账号、不落盘）。
+
+| 卡 | 内容 |
+|---|---|
+| 环境 | 账号/uid/VIP、数据目录、session 版本与历史条数/黑名单/周报数、13 个工具名、DJ 模型与来源、喜欢缓存、播放上报、写接口开关、探针时间 |
+| M0 探针 V1–V3 | 读 `<dataDir>/probe.json`：每项 `通过/不通过/仅演练/跳过/手动` + 一句话结论；没跑过时给出要执行的命令 |
+| 功能自检 | 12 项，逐项按钮或「全部运行」：六页 200、`api/state|taste|report|library|lyric|dev`、`POST api/scene` 草稿；显示 HTTP 状态、耗时、摘要（不是裸 JSON） |
+| 六个页面 | 播放器/曲库/画像/周报/场景/歌词的直达链接 |
+| 人工检查 | A1 播放、A2 切会话不断音、A3 队列、A5 登录、A6 场景、A7 周报、A9 合规——自动测不了的留在这一列 |
+
+面板右上入口是虚线框的「检查台」，故意做得低调（不是给日常听歌用的）。
+
 ## 1. M0 四个未知项
 
 | # | 未知 | 验证方式 | 结论 | 证据（请求 / 响应 / 观察） |
 |---|---|---|---|---|
-| V1 | `play/record` 读听歌记录 | `GET /weapi/v1/play/record?uid=&type=0\|1` | 待验证 | |
-| V2 | `playlist/create` 建歌单 | 真 cookie 打接口，看返回 `code` | 待验证 | |
-| V3 | `playlist/manipulate/tracks` 加曲目 | 同上 | 待验证 | |
-| V4 | DJ 模型路由能否真出 plan | 配 `dj.provider/model`，面板「开始 DJ」 | 待验证 | |
+| V1 | `play/record` 读听歌记录 | `GET /weapi/v1/play/record?uid=&type=0\|1` | **✅ 可读**（2026-10-23） | `node scripts/probe.mjs`：account 喝水去喝水 uid 562295789；V1 返回 `allData 100 首 / weekData 0 首`。注意 allData 有 100 条上限、weekData 只覆盖本周，历史要跟本地 v2 历史合并去重。 |
+| V2 | `playlist/create` 建歌单 | 真 cookie 打接口，看返回 `code` | **✅ 可用**（`--write` 实测） | `weapi/playlist/create {name:'NCM 探针 · 可删',privacy:'10'}` → `code 200`，返回 id（如 18514410813）。删除用 `weapi/playlist/remove {ids:'[id]'}`；`playlist/delete` 会回 400，别用。 |
+| V3 | `playlist/manipulate/tracks` 加曲目 | 同上 | **✅ 可用** | `{op:'add',pid,tracks,trackIds}` → `code 200`，账号端歌单里能看到；两次实测都成功。 |
+| V4 | DJ 模型路由能否真出 plan | 配 `dj.provider/model`，面板「开始 DJ」 | 待验证（人工） | 探针只能给出配置状态：当前未 pin provider/model，走 DSH 默认路由（`modelSource: discovered`）。需要人在面板点一次「开始 DJ」，看队列是否补满。 |
 
-**降级预案**：
+**M0 结论（2026-10-23）**：V1/V2/V3 全通 → **写歌单能力可用**，场景页「存到我的歌单」可以按 M6 计划接通（先保持置灰到那一版落地）；周报/画像可以「账号历史 + 本机历史」双源合并，界面仍要标明来源。探针结论文件：`<dataDir>/probe.json`，制作者检查台 `/music/dev` 直接读。
+
+**降级预案**（保留，防以后接口变动）：
 - V1 不可用 → 周报只用本地历史，界面标明「本机数据 · 换设备会丢」。
 - V2/V3 不可用 → 场景歌单只存本地 + 导出文本；M6 工期 -1.5d。
 - V4 不可用 → DJ 卡置灰并提示去设置，播放内核照旧。
@@ -103,3 +122,28 @@ node scripts/probe.mjs --write                               # 真建一张临�
 | 10-22 | 环形图红/青/灰混用，违反用色规则 | 首名高亮没收敛到红 | 类别灰阶 + 仅首名红 + 正向 delta 才用 teal |
 | 10-22 | 「存到我的歌单」按钮可按 | D8 未验证写接口前必须置灰 | 页面 disabled + title 说明，服务端另返 501 `UNVERIFIED` |
 | 10-22 | 打包后 bundle patch 仍指向旧包名 | 从基座复制来的 `cordis.patch.yml` 未改名 | 改为 `name: 'ncm-plugin'` 后重新 `npm pack` |
+
+## 5. 10-23 交互修复（用户反馈：DJ 入口找不到 / 曲库点完不播 / 曲库太长）
+
+| 问题 | 原因 | 处置（已用 CDP 真点击验证） |
+|---|---|---|
+| 面板没有「开始 DJ」按钮，只在内部开开关 | 基座只有 `#dj-toggle` 开关，概念稿里的红按钮没实现 | `panel.html` 加 `#dj-start`「开始 DJ」+ 轮询 `api/state` 等 `dj.lastPlanAt` 更新，完成后 toast「AI DJ 补了 N 首：…」；实测队列 500→505、`source: heuristic` |
+| DJ 提示里混着英文诊断（`model tier unavailable…`） | 服务端 `plan.vibe` 原样渲染 | 面板改为中文：`+5 首 · 模型没连上，先按相似歌曲、榜单和你的口味兜底`，并提示「想更准：在 AI DJ 模型里选一个可用模型」 |
+| 曲库点「播放全部 / 单曲 / 插到下一首 / 每日推荐」后不播，要手动回主页 | 真正出声的引擎在播放器页面，页面只发指令，成功后停在曲库 | `library.html` 新增 `goToPlayer()`（480ms 后跳 `/music/panel`），四类操作成功都调用；CDP 实测点歌后 URL = `/music/panel`、`playing: true`，插下一首后队列 505→506 且 `next = 宝船` |
+| 曲库页太长（108 张歌单铺三屏） | 一次渲染全部歌单 | 默认只显示 18 张 + 「显示全部 108 张 / 收起」，卡片 `minmax 140px`；CDP 实测 18→108，按钮文案对 |
+| 场景页「试听全部」同样只提示不跳 | 同曲库问题 | `scene.html#previewAll` 成功后 480ms 跳 `/music/panel` |
+
+遗留：`V4`（真模型出 plan）与 `A2`（切会话不断音）必须装进 DSH 才能验；preview 里 DJ 走启发式兜底（相似/榜单/口味），所以「播放列表不变」的印象已消除，但真模型质量要等装包。
+
+## 6. 浮空岛（2026-10-23，用户二次反馈）
+
+用户要「底部加一条浮空岛，播放不跳页而是同步给主页播放列表」，并报「主页音效设置看不到字」。
+
+- 新增 `lib/ui/mini.js`：六页（library/taste/weekly/scene/lyric/dev）通过 `<script src="__BASE__/mini.js" defer>` 共用，路由 `GET /music/mini.js`（`router.js` 新增，每次请求读文件，不缓存）。
+- 数据：SSE `GET /api/events` 的 `state` 事件 + 3s 轮询兜底；控制走 `POST /api/control`、`POST /api/taste`、`POST /api/quality`、`POST /api/report`。
+- 音频：桌面壳里 `window.parent.__dshMusicEngine.sync` 存在时只做遥控器（音频归壳）；没有壳（preview/H5）时浮空岛自己加载 `/music/playback.js`，在页面内起 `<audio>`。切页前 `pagehide` + `visibilitychange` 用 `sendBeacon` 把真实位置交回服务端，新页按 `reported.position` 续播（同曲只补一次）。
+- 控件：封面/歌名/艺人、喜欢、上一首/播放暂停/下一首、进度与时长、队列数（点击回播放器）、音质下拉、静音+音量、打开播放器；1100/720 两档收窄。
+- 曲库与场景页不再 `goToPlayer()` 跳页（`library.html` 的播放/插队、`scene.html` 的试听全部），改为浮空岛接管。
+- 面板「看不到字」根因：`input, select` 没给 `<option>` 定背景/前景，Chromium 的原生下拉是白底、选项文字继承近白 → 白字白底。`panel.html` 加 `select option, select optgroup { background:#1c1d21; color:#f9fafb; }`；`mini.js` 的音质下拉同样处理。
+- CDP 实测：曲库点「播放全部」→ 仍停在 `/music/library`、岛显示「Let Me Go(共创版)」、`audio.paused=false`、`currentTime=3.4s`；跳 `/music/taste` 后岛仍在播同一首（`currentTime` 连续，不是从 0 重来）；暂停/继续/下一首按钮均改变服务端 `playing`/`index`；播放器页不出现浮空岛（`island on panel: false`）；`select option` 计算样式 `color rgb(232,234,237)` / `background rgb(25,28,34)`。
+- 测试仍 38/38；`npm pack` 后更新工作区根的 tgz。

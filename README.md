@@ -15,8 +15,10 @@ DSH 的网易云音乐插件：播放器 + 侧栏面板 + AI 对话控制，外�
 - [x] 聚合层：`lib/features.js`（画像/周报/场景/歌词/二创）、`lib/model.js`（LLM 取用）、`lib/tagstore.js`（标签缓存）
 - [x] 13 个工具（旧 7 + 新 6）与 5 个独立页（`/music/{library,taste,weekly,scene,lyric}`）
 - [x] 曲库页：登录后看自建/收藏歌单、最近播放、每日推荐；点歌单出曲目列表，点行即播（H5 登录后「没有歌单」的反馈补的）
-- [x] 端到端冒烟：`node --test` 37/37（含 apply 挂载、13 工具、页面路由、API 空态）
-- [ ] **M0 真实账号验证**：V1 听歌记录读取 / V2 建歌单 / V3 加曲目 / V4 DJ 出 plan（`scripts/probe.mjs` 已就绪，等扫码登录）
+- [x] 端到端冒烟：`node --test` 38/38（含 apply 挂载、13 工具、页面路由、API 空态、检查台）
+- [x] 制作者检查台 `/music/dev`：环境事实 + M0 探针结论 + 12 项功能自检 + 六页入口 + 人工清单
+- [x] 交互（10-23）：面板加「开始 DJ」按钮并等 plan 回执；歌单默认 18 张 +「显示全部」；底部浮空岛 `lib/ui/mini.js` 在六页共享播放条——播放/切歌不离开当前页，壳里只遥控、纯 H5 自己接管音频
+- [ ] **M0 真实账号验证**：V1 ✅ 可读 / V2 ✅ 可用 / V3 ✅ 可用（2026-10-23 探针实测，临时歌单已自动删除）；剩 **V4** 需人在面板点一次「开始 DJ」
 - [ ] M1 剩余：面板文案已强制中文，改名与 qrcode 常量双写检查待做
 - [ ] M5/M6：五屏与概念稿的视觉对齐、写歌单落地（依赖 V2/V3）、打包发布
 
@@ -24,12 +26,16 @@ DSH 的网易云音乐插件：播放器 + 侧栏面板 + AI 对话控制，外�
 
 ```powershell
 cd music-plugin
-node --test --test-isolation=none "test/*.test.mjs"   # 37 个用例，纯离线
+node --test --test-isolation=none "test/*.test.mjs"   # 38 个用例，纯离线
 node scripts/preview.mjs --keep                       # 本地预览五屏（不装 DSH 也能看）
 node scripts/fixture.mjs --out "$env:TEMP\ncm-demo"   # 造一份演示数据（看有数据的样子）
 node scripts/preview.mjs --data-dir "$env:TEMP\ncm-demo" --port 7789 --keep
 node scripts/probe.mjs                                # M0 探针：只读，V2/V3 默认 dry-run
+node scripts/probe.mjs --write                        # 真建临时歌单验 V2/V3，验完自动删
 ```
+
+预览服务起来后，打开 **`/music/dev`**（或面板右上「检查台」）就能看到：环境事实、`probe.json` 里的
+M0 结论、逐项功能自检（六页 + 六个 API + 场景草稿）、六页入口和人工检查清单。
 
 `scripts/probe.mjs` 读 `~/.dsh/music/session.json` 的 cookie（只打印指纹），验证 V1-V4 后按提示把结论抄进 [`NOTES.md`](./NOTES.md) 并回填 [`PLAN.md`](./PLAN.md) §6.4。
 
@@ -40,7 +46,7 @@ node scripts/probe.mjs                                # M0 探针：只读，V2/
 1. **插件市场**：把本目录打成 tarball（`npm pack`，产出 `ncm-plugin-0.1.0.tgz`），用 DSH 设置里的插件安装入口装本地包，然后重启 DSH。
 2. **手动**：把本目录放到 `~/.dsh/profiles/desktop/node_modules/ncm-plugin`（或 `npm install <本目录>`），在 profile 的插件配置里启用 `ncm-plugin`，重启。
 
-装好后：侧栏出现「音乐」，面板顶部有 `曲库 / 画像 / 周报 / 场景 / 歌词二创` 五个入口；对话里可用 `music_search`、`music_play`、`music_dj`、`scene_build`、`taste_profile`、`weekly_report`、`lyric_remix` 等 13 个工具。
+装好后：侧栏出现「音乐」，面板顶部有 `曲库 / 画像 / 周报 / 场景 / 歌词二创 / 检查台` 六个入口；对话里可用 `music_search`、`music_play`、`music_dj`、`scene_build`、`taste_profile`、`weekly_report`、`lyric_remix` 等 13 个工具。
 
 ## 在浏览器（H5）里测
 

@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>制作者检查台 · 网易云音乐</title>
+<style>
+  :root {
+    --bg: #0F1115;
+    --card: #171A20;
+    --card-2: #1C2029;
+    --line: #262A33;
+    --text: #E8EAED;
+    --muted: #8B909A;
+    --red: #E5484D;
+    --teal: #2FB3A6;
+    --amber: #D8A657;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; }
+
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 28px 64px; }
+
+  /* ---- header ---------------------------------------------------------- */
+  header.top {
+    display: flex; align-items: center; gap: 14px;
+    padding: 22px 0 18px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .back {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--card);
+    display: grid; place-items: center; color: var(--muted); cursor: pointer;
+  }
+  .back:hover { color: var(--text); border-color: #3A3F4A; }
+  .titles { display: flex; flex-direction: column; gap: 2px; }
+  .titles h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: .3px; }
+  .titles .sub { color: var(--muted); font-size: 12px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 8px; padding: 7px 13px; font-size: 12px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: #3A3F4A; background: var(--card-2); }
+  .btn.primary { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.tiny { padding: 3px 9px; font-size: 11px; }
+
+  /* ---- layout ---------------------------------------------------------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid .span-2 { grid-column: 1 / -1; }
+  @media (max-width: 1120px) {
+    .grid { grid-template-columns: 1fr; }
+    .grid .span-2 { grid-column: auto; }
+    .wrap { padding: 0 16px 48px; }
+  }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px;
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .tag { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: auto; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); display: inline-block; }
+
+  /* ---- overview table -------------------------------------------------- */
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { overflow-wrap: anywhere; }
+  .kv code, .mono {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; color: #C9CDD6;
+  }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .pill.ok { color: var(--teal); border-color: rgba(47,179,166,.4); background: rgba(47,179,166,.08); }
+  .pill.no { color: var(--red); border-color: rgba(229,72,77,.4); background: rgba(229,72,77,.08); }
+  .pill.warn { color: var(--amber); border-color: rgba(216,166,87,.4); background: rgba(216,166,87,.08); }
+
+  /* ---- probe ----------------------------------------------------------- */
+  .probe-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .probe-head .when { color: var(--muted); font-size: 12px; }
+  .probe-row { display: grid; grid-template-columns: 74px 62px 1fr; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: start; }
+  .probe-row:first-of-type { border-top: none; }
+  .probe-row .id { font-weight: 600; letter-spacing: .3px; }
+  .probe-row .msg { color: #C9CDD6; overflow-wrap: anywhere; }
+  .empty { color: var(--muted); padding: 10px 0 2px; }
+  .empty code { background: var(--card-2); padding: 2px 6px; border-radius: 6px; }
+
+  /* ---- checks ---------------------------------------------------------- */
+  table.checks { width: 100%; border-collapse: collapse; }
+  table.checks th, table.checks td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.checks th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  table.checks tr:last-child td { border-bottom: none; }
+  table.checks td.name { white-space: nowrap; }
+  table.checks td.res { color: #C9CDD6; overflow-wrap: anywhere; font-size: 12px; }
+  table.checks td.ms { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .runbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .runbar .hint { color: var(--muted); font-size: 12px; }
+
+  /* ---- pages ----------------------------------------------------------- */
+  .pages { display: flex; gap: 8px; flex-wrap: wrap; }
+  .page-link {
+    border: 1px solid var(--line); background: var(--card-2); border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; min-width: 132px;
+  }
+  .page-link:hover { border-color: var(--red); }
+  .page-link b { display: block; font-size: 12px; margin-bottom: 2px; }
+  .page-link span { color: var(--muted); font-size: 11px; }
+
+  /* ---- manual checklist ------------------------------------------------ */
+  ol.manual { margin: 4px 0 0; padding-left: 18px; }
+  ol.manual li { margin: 7px 0; }
+  ol.manual li b { color: var(--text); }
+  ol.manual li span { color: var(--muted); }
+
+  footer.foot { margin-top: 26px; color: var(--muted); font-size: 11.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" id="back" href="__BASE__/panel" title="回播放器">‹</a>
+    <div class="titles">
+      <h1>制作者检查台</h1>
+      <div class="sub">本机自检 · 数据不出本机 · 给开发验收用，不是给日常听歌用的</div>
+    </div>
+    <div class="header-actions">
+      <span class="pill" id="healthPill">读取中…</span>
+      <button class="btn" id="reload">刷新环境</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- overview -->
+    <section class="card span-2" id="overviewCard">
+      <h2><span class="dot"></span>环境<span class="tag" id="uptime">—</span></h2>
+      <div class="kv" id="overview"><div class="k">状态</div><div class="v">正在读取 /api/dev…</div></div>
+    </section>
+
+    <!-- probe -->
+    <section class="card span-2">
+      <h2><span class="dot" style="background:var(--amber)"></span>M0 探针 V1–V3<span class="tag" id="probeTag"></span></h2>
+      <div id="probeBody"><div class="empty">正在读取探针结论…</div></div>
+    </section>
+
+    <!-- self tests -->
+    <section class="card span-2">
+      <h2><span class="dot" style="background:var(--teal)"></span>功能自检<span class="tag">直接打本机接口，不改账号数据</span></h2>
+      <div class="runbar">
+        <button class="btn primary" id="runAll">全部运行</button>
+        <span class="hint">每项会真的请求一次接口；场景一项可能需要十几秒（要抓候选 + 标签）。</span>
+      </div>
+      <table class="checks">
+        <thead><tr><th>检查</th><th>结果</th><th>耗时</th><th></th></tr></thead>
+        <tbody id="checkBody"></tbody>
+      </table>
+    </section>
+
+    <!-- pages -->
+    <section class="card">
+      <h2><span class="dot" style="background:var(--muted)"></span>六个页面</h2>
+      <div class="pages" id="pageLinks"></div>
+    </section>
+
+    <!-- manual checklist -->
+    <section class="card">
+      <h2><span class="dot" style="background:var(--muted)"></span>人工检查（自动测不了的）</h2>
+      <ol class="manual">
+        <li><b>A1 播放</b> <span>曲库点一张歌单 → 点「播放全部」→ 能出声；拖进度条；底栏音量条与静音各动一次；音质切 128/192/320。</span></li>
+        <li><b>A2 切会话不断音</b> <span>播放中在 DSH 里新开/切换会话，音乐不停；回面板状态一致。</span></li>
+        <li><b>A3 队列</b> <span>点单曲「插到下一首」→ 队列顺序真的变了；点「清空」→ 播放停止、队列空。</span></li>
+        <li><b>A5 登录</b> <span>退出登录 → 曲库显示「还没有登录网易云」；扫码后曲库出现自建/收藏歌单。</span></li>
+        <li><b>A6 场景</b> <span>「下雨天的下午，别太吵」→ 草稿贴合场景；「只存本地」成功；「存到我的歌单」保持置灰（写接口未验证）。</span></li>
+        <li><b>A7 周报</b> <span>周报数字与「这一周，你」文案一致；0 分钟的日子有底线；切「上周」能算出来。</span></li>
+        <li><b>A9 合规</b> <span>全程不解灰 VIP；面板与检查台都不显示 cookie；网络面板里歌单写操作只出现在本地。</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <footer class="foot">
+    结论只读本机 <code id="dataDirFoot">…</code>；探针由 <code>node scripts/probe.mjs</code> 生成。
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var BASE = '__BASE__';
+  var state = { dev: null, checks: [] };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function bytes(n) {
+    if (!n) return '0 B';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  }
+  function duration(ms) {
+    if (ms == null) return '—';
+    if (ms < 1000) return Math.round(ms) + ' ms';
+    var s = Math.floor(ms / 1000);
+    if (s < 60) return s + ' s';
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + ' 分 ' + (s % 60) + ' 秒';
+    return Math.floor(m / 60) + ' 小时 ' + (m % 60) + ' 分';
+  }
+  function when(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    function p(n) { return n < 10 ? '0' + n : String(n); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  /** One request with a hard timeout; never throws, always reports. */
+  function request(path, options) {
+    var opts = options || {};
+    var started = performance.now();
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort('timeout'); }, opts.timeoutMs || 12000);
+    var init = { method: opts.method || 'GET', signal: controller.signal, headers: {}, cache: 'no-store' };
+    if (opts.body !== undefined) {
+      init.headers['content-type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(BASE + path, init).then(function (res) {
+      return res.text().then(function (text) {
+        clearTimeout(timer);
+        return { ok: res.ok, status: res.status, body: text, ms: performance.now() - started };
+      });
+    }).catch(function (cause) {
+      clearTimeout(timer);
+      return { ok: false, status: 0, body: String(cause && cause.message || cause), ms: performance.now() - started };
+    });
+  }
+
+  function jsonOf(text) {
+    try { return JSON.parse(text); } catch (e) { return null; }
+  }
+
+  /* ---- overview -------------------------------------------------------- */
+  function renderOverview(dev) {
+    var rows = [];
+    var probe = dev.probe;
+    rows.push(['账号', dev.session.authenticated
+      ? '<span class="pill ok">已登录</span> ' + esc((dev.session.account && dev.session.account.nickname) || '') +
+        ' <span class="mono">uid ' + esc((dev.session.account && dev.session.account.uid) || '?') + '</span>' +
+        (dev.session.account && dev.session.account.vip ? ' <span class="pill warn">VIP</span>' : '')
+      : '<span class="pill">未登录</span> <span class="muted">扫码在面板右上「登录」</span>']);
+    rows.push(['数据目录', '<code>' + esc(dev.dataDir || '（未知）') + '</code>']);
+    rows.push(['会话', 'version ' + esc(dev.session.version) + ' · 历史 ' + esc(dev.session.history) + ' 条 · 黑名单 ' + esc(dev.session.dislikes) + ' · 周报 ' + esc(dev.session.reports) + ' 份']);
+    rows.push(['工具', esc((dev.tools || []).length) + ' 个 <span class="mono">' + esc((dev.tools || []).join(', ')) + '</span>']);
+    rows.push(['DJ', dev.dj
+      ? (dev.dj.enabled ? '<span class="pill ok">开启</span>' : '<span class="pill">关闭</span>') +
+        ' · 模型 <span class="mono">' + esc(dev.dj.model || '未配置') + '</span>' +
+        ' · 来源 ' + esc(dev.dj.modelSource || '—') +
+        (dev.dj.modelError ? ' · <span class="pill no">上次模型失败</span> ' + esc(dev.dj.modelError) : '')
+      : '—']);
+    rows.push(['喜欢缓存', dev.likes
+      ? '缓存 ' + esc(dev.likes.cached ?? '?') + ' 首 · 待同步 ' + esc(dev.likes.pending ?? 0) +
+        (dev.likes.error ? ' · <span class="pill no">' + esc(dev.likes.error) + '</span>' : '')
+      : '—']);
+    rows.push(['播放上报', dev.scrobble
+      ? (dev.scrobble.enabled ? '<span class="pill ok">开启</span>' : '<span class="pill">关闭</span>') +
+        ' · ' + (dev.scrobble.active ? '正在上报' : '空闲') +
+        (dev.scrobble.last ? ' · 上次 ' + esc(dev.scrobble.last) : '')
+      : '—']);
+    rows.push(['写接口', dev.config && dev.config.write
+      ? '<span class="pill warn">配置已开</span> <span class="mono">' + esc(JSON.stringify(dev.config.write)) + '</span>'
+      : '<span class="pill">未开</span> 歌单写操作仍返回 501：M0 已验证接口可用，M6 再接真实落库']);
+    rows.push(['探针', probe
+      ? '<span class="pill ' + (probe.failed && probe.failed.length ? 'no' : 'ok') + '">' +
+        (probe.failed && probe.failed.length ? '有未通过项' : '已跑') + '</span> ' + esc(when(probe.finishedAt || probe.startedAt))
+      : '<span class="pill">没跑过</span> <code>node scripts/probe.mjs</code>']);
+
+    $('overview').innerHTML = rows.map(function (row) {
+      return '<div class="k">' + esc(row[0]) + '</div><div class="v">' + row[1] + '</div>';
+    }).join('');
+    $('uptime').textContent = '已运行 ' + duration(dev.uptimeMs);
+    $('dataDirFoot').textContent = dev.dataDir || '…';
+
+    var pill = $('healthPill');
+    pill.textContent = 'v' + esc(dev.session.version) + ' · 面板契约 ' + esc(dev.panelContract);
+    pill.className = 'pill ok';
+  }
+
+  /* ---- probe ----------------------------------------------------------- */
+  function renderProbe(probe) {
+    var body = $('probeBody');
+    var tag = $('probeTag');
+    if (!probe || !probe.results) {
+      tag.textContent = '';
+      body.innerHTML = '<div class="empty">还没跑过探针。在项目目录执行 <code>node scripts/probe.mjs</code>' +
+        '（默认只读；要真的建歌单/加曲目再加 <code>--write</code>），结论会写进数据目录的 <code>probe.json</code>，刷新本页即可看到。</div>';
+      return;
+    }
+    tag.textContent = when(probe.finishedAt || probe.startedAt);
+    var order = ['V1', 'V2', 'V3', 'V4'];
+    var LABELS = { OK: ['通过', 'ok'], NO: ['不通过', 'no'], SKIP: ['跳过', 'warn'], DRY: ['仅演练', 'warn'], MANUAL: ['手动', 'warn'] };
+    var html = '';
+    order.forEach(function (id) {
+      var item = probe.results[id];
+      if (!item) return;
+      var pair = LABELS[item.status] || [item.status || '未知', 'warn'];
+      html += '<div class="probe-row">' +
+        '<div class="id">' + esc(id) + '</div>' +
+        '<div><span class="pill ' + pair[1] + '">' + esc(pair[0]) + '</span></div>' +
+        '<div class="msg">' + esc(item.detail || item.message || '') + '</div>' +
+        '</div>';
+    });
+    if (probe.failed && probe.failed.length) {
+      html += '<div class="empty">未通过：' + esc(probe.failed.join('、')) +
+        ' → 按 HANDOFF/PLAN §6.4 的降级预案办（不通过就只存本地 / DJ 卡置灰）。</div>';
+    }
+    body.innerHTML = html;
+  }
+
+  /* ---- checks ---------------------------------------------------------- */
+  var CHECKS = [
+    {
+      id: 'page-panel', name: '面板 /panel', run: function () {
+        return request('/panel').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'page-library', name: '曲库 /library', run: function () {
+        return request('/library').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'page-taste', name: '画像 /taste', run: function () {
+        return request('/taste').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'page-weekly', name: '周报 /weekly', run: function () {
+        return request('/weekly').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'page-scene', name: '场景 /scene', run: function () {
+        return request('/scene').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'page-lyric', name: '歌词 /lyric', run: function () {
+        return request('/lyric').then(function (r) { return r.ok ? 'HTML ' + bytes(r.body.length) : 'HTTP ' + r.status; });
+      }
+    },
+    {
+      id: 'state', name: '队列状态 /api/state', run: function () {
+        return request('/api/state').then(function (r) {
+          var data = jsonOf(r.body);
+          if (!r.ok || !data) return 'HTTP ' + r.status;
+          return 'queue ' + ((data.queue && data.queue.tracks && data.queue.tracks.length) || 0) + ' 首 · ' +
+            (data.current ? '正在放「' + data.current.name + '」' : '未播放');
+        });
+      }
+    },
+    {
+      id: 'taste', name: '画像数据 /api/taste', timeoutMs: 20000, run: function () {
+        return request('/api/taste?range=4w', { timeoutMs: 20000 }).then(function (r) {
+          var data = jsonOf(r.body);
+          if (!r.ok || !data) return 'HTTP ' + r.status + ' ' + r.body.slice(0, 120);
+          var profile = data.profile;
+          var metrics = profile && profile.metrics;
+          return metrics
+            ? '样本 ' + metrics.plays + ' 次播放 / ' + metrics.tracks + ' 首 · 来源 ' + ((data.dataSource && data.dataSource.label) || '?')
+            : '空画像（历史不足）· 来源 ' + ((data.dataSource && data.dataSource.label) || '?');
+        });
+      }
+    },
+    {
+      id: 'report', name: '周报数据 /api/report', timeoutMs: 20000, run: function () {
+        return request('/api/report?week=this', { timeoutMs: 20000 }).then(function (r) {
+          var data = jsonOf(r.body);
+          if (!r.ok || !data) return 'HTTP ' + r.status + ' ' + r.body.slice(0, 120);
+          var report = data.report;
+          return report
+            ? report.week.label + ' · ' + report.metrics.plays + ' 次播放 · 新歌 ' + report.metrics.newTracks
+            : '本周还没有数据';
+        });
+      }
+    },
+    {
+      id: 'library', name: '曲库数据 /api/library', timeoutMs: 20000, run: function () {
+        return request('/api/library', { timeoutMs: 20000 }).then(function (r) {
+          var data = jsonOf(r.body);
+          if (r.status === 401) return '未登录（页面应显示空态 + 去面板登录）';
+          if (!r.ok || !data) return 'HTTP ' + r.status + ' ' + r.body.slice(0, 120);
+          return '自建 ' + (data.created || []).length + ' · 收藏 ' + (data.collected || []).length +
+            ' · 最近 ' + (data.recent || []).length + ' · 推荐 ' + (data.daily || []).length;
+        });
+      }
+    },
+    {
+      id: 'lyric', name: '歌词解析 /api/lyric', timeoutMs: 20000, run: function () {
+        return request('/api/lyric?id=421423808', { timeoutMs: 20000 }).then(function (r) {
+          var data = jsonOf(r.body);
+          if (r.status === 404) return '这首歌没有歌词（正常分支，页面应显示空态）';
+          if (!r.ok || !data) return 'HTTP ' + r.status + ' ' + r.body.slice(0, 120);
+          var lines = (data.lyrics && data.lyrics.lines) || [];
+          return '「' + (data.track && data.track.name || '?') + '」' + lines.length + ' 行' +
+            (data.lyrics && data.lyrics.wordLevel ? ' · 逐字' : '');
+        });
+      }
+    },
+    {
+      id: 'scene', name: '场景草稿 /api/scene', timeoutMs: 45000, run: function () {
+        return request('/api/scene', {
+          method: 'POST', timeoutMs: 45000,
+          body: { brief: '下雨天的下午，别太吵', count: 6 }
+        }).then(function (r) {
+          var data = jsonOf(r.body);
+          if (!r.ok || !data) return 'HTTP ' + r.status + ' ' + r.body.slice(0, 160);
+          var draft = data.draft || data;
+          var warn = (draft.warnings && draft.warnings.length) ? ' · 警告 ' + draft.warnings.length + ' 条' : '';
+          return (draft.count || 0) + ' 首 · 约 ' + (draft.estimatedMinutes || 0) + ' 分钟 · 候选池 ' + (draft.poolSize || 0) + warn;
+        });
+      }
+    },
+    {
+      id: 'dev', name: '检查台数据 /api/dev', run: function () {
+        return request('/api/dev').then(function (r) {
+          return r.ok ? '200 · ' + bytes(r.body.length) : 'HTTP ' + r.status;
+        });
+      }
+    }
+  ];
+
+  function renderChecks() {
+    $('checkBody').innerHTML = CHECKS.map(function (check) {
+      var row = state.checks.filter(function (item) { return item.id === check.id; })[0];
+      var res = row ? row.res : '<span style="color:var(--muted)">未运行</span>';
+      var ms = row ? (row.ms < 1 ? '<1 ms' : Math.round(row.ms) + ' ms') : '—';
+      return '<tr data-id="' + esc(check.id) + '">' +
+        '<td class="name">' + esc(check.name) + '</td>' +
+        '<td class="res">' + res + '</td>' +
+        '<td class="ms">' + ms + '</td>' +
+        '<td style="text-align:right"><button class="btn tiny" data-run="' + esc(check.id) + '">运行</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function runCheck(check) {
+    renderChecks();
+    var row = document.querySelector('tr[data-id="' + check.id + '"]');
+    if (row) {
+      row.querySelector('.res').innerHTML = '<span style="color:var(--muted)">运行中…</span>';
+      row.querySelector('.ms').textContent = '…';
+    }
+    return check.run().then(function (res) {
+      state.checks = state.checks.filter(function (item) { return item.id !== check.id; });
+      state.checks.push({ id: check.id, res: esc(res), ms: res && res.ms });
+      renderChecks();
+    });
+  }
+
+  function runAll() {
+    var button = $('runAll');
+    button.disabled = true;
+    var chain = Promise.resolve();
+    CHECKS.forEach(function (check) {
+      chain = chain.then(function () { return runCheck(check); });
+    });
+    return chain.then(function () {
+      button.disabled = false;
+      var bad = CHECKS.filter(function (check) {
+        var row = state.checks.filter(function (item) { return item.id === check.id; })[0];
+        return !row || /HTTP (?!200)|失败/.test(row.res);
+      });
+      button.textContent = bad.length ? '重跑（' + bad.length + ' 项异常）' : '全部通过 · 再跑一次';
+    });
+  }
+
+  /* ---- pages ----------------------------------------------------------- */
+  function renderPages(pages) {
+    var meta = {
+      panel: ['播放器', '/music/panel'],
+      library: ['曲库', '/music/library'],
+      taste: ['口味画像', '/music/taste'],
+      weekly: ['听歌周报', '/music/weekly'],
+      scene: ['场景歌单', '/music/scene'],
+      lyric: ['歌词二创', '/music/lyric']
+    };
+    var list = ['panel'].concat(pages || []).filter(function (name, index, all) {
+      return meta[name] && all.indexOf(name) === index;
+    });
+    $('pageLinks').innerHTML = list.map(function (name) {
+      return '<a class="page-link" href="' + BASE + '/' + esc(name) + '">' +
+        '<b>' + esc(meta[name][0]) + '</b><span class="mono">' + esc(meta[name][1]) + '</span></a>';
+    }).join('');
+  }
+
+  /* ---- boot ------------------------------------------------------------ */
+  function loadDev() {
+    return request('/api/dev').then(function (res) {
+      var dev = jsonOf(res.body);
+      if (!res.ok || !dev) {
+        $('overview').innerHTML = '<div class="k">错误</div><div class="v">' +
+          esc('GET /api/dev 失败：HTTP ' + res.status + ' ' + res.body.slice(0, 200)) + '</div>';
+        return;
+      }
+      state.dev = dev;
+      renderOverview(dev);
+      renderProbe(dev.probe);
+      renderPages(dev.pages);
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    var runId = target.getAttribute('data-run');
+    if (runId) {
+      var check = CHECKS.filter(function (item) { return item.id === runId; })[0];
+      if (check) runCheck(check);
+      return;
+    }
+    if (target.id === 'reload') {
+      target.disabled = true;
+      loadDev().then(function () { target.disabled = false; });
+      return;
+    }
+    if (target.id === 'runAll') runAll();
+  });
+
+  renderChecks();
+  loadDev();
+})();
+</script>
+<script src="__BASE__/mini.js" defer></script>
+</body>
+</html>

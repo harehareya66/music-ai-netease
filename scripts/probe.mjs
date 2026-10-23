@@ -174,7 +174,7 @@ async function main() {
       });
       playlistId = created?.id ?? created?.playlist?.id ?? null;
       if (String(created?.code) === '200' && playlistId) {
-        record('V2', 'OK', `建成歌单 id=${playlistId}（记得手动删掉）`, { playlistId });
+        record('V2', 'OK', `建成歌单 id=${playlistId}`, { playlistId });
       } else {
         record('V2', 'NO', `code=${created?.code} ${created?.message ?? ''}`.trim(), {
           code: created?.code,
@@ -202,6 +202,24 @@ async function main() {
         }
       } catch (cause) {
         record('V3', 'NO', `${cause.message}${cause.code ? ` (${cause.code})` : ''}`);
+      }
+    }
+
+    // 探针建的是真歌单，验完不留垃圾：尽力删掉，删不掉就把 id 打出来让用户手动删。
+    // 正确的删除接口是 playlist/remove（playlist/delete 会回 400）。
+    if (playlistId) {
+      try {
+        const removed = await weapi(api, '/weapi/playlist/remove', { ids: `[${playlistId}]` });
+        if (String(removed?.code) === '200') {
+          report.results.V2.detail += '；临时歌单已删除';
+          console.log(`🧹 临时歌单 ${playlistId} 已删除`);
+        } else {
+          report.results.V2.detail += `；临时歌单 id=${playlistId} 未删掉，请手动删除`;
+          console.log(`⚠️ 临时歌单没删掉（code=${removed?.code}），请在网易云里手动删「${TEMP_PLAYLIST}」`);
+        }
+      } catch (cause) {
+        report.results.V2.detail += `；临时歌单 id=${playlistId} 未删掉（${cause.message}），请手动删除`;
+        console.log(`⚠️ 删除临时歌单失败：${cause.message}`);
       }
     }
   }
@@ -239,6 +257,19 @@ async function main() {
   const failed = rows.filter(([, value]) => value.status === 'NO').map(([key]) => key);
   report.finishedAt = new Date().toISOString();
   report.failed = failed;
+
+  // 结论落到 dataDir/probe.json，制作者检查台（/music/dev）直接读它显示。
+  // 只写结论：cookie 与完整曲目列表都不进文件。
+  if (!args.has('--no-save')) {
+    const outPath = path.join(path.dirname(sessionPath), 'probe.json');
+    try {
+      fs.writeFileSync(outPath, JSON.stringify({ ...report, sessionPath: undefined }, null, 2), { mode: 0o600 });
+      console.log(`\n结论已写入 ${outPath}（检查台 /music/dev 会读它）`);
+    } catch (cause) {
+      console.error(`结论写盘失败：${cause.message}`);
+    }
+  }
+
   if (JSON_OUT) console.log(JSON.stringify(report, null, 2));
   process.exitCode = failed.length > 0 ? 1 : 0;
 }
