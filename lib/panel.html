@@ -221,7 +221,7 @@
       }
       .tab:hover:not(:disabled) { background: none; color: var(--fg); }
       .tab.on { color: var(--fg); border-bottom-color: var(--accent); }
-      .lyrics[hidden], .details[hidden] { display: none; }
+      .lyrics[hidden], .details[hidden], .profile[hidden] { display: none; }
       /* The pane is a glance at the current line, not a page: a few lines of
          synced text, scrolled for the rest. `--lyrics-lines` is the single knob. */
       .lyrics {
@@ -232,6 +232,18 @@
       .lyrics::-webkit-scrollbar { display: none; }
       .lyrics p { margin: 0; padding: 2px 0; color: var(--faint); transition: color 0.15s; }
       .lyrics p.on { color: var(--fg); font-weight: 600; }
+
+      /* 画像摘要：面板里只放一句话 + 标签 + 三个数，完整画像在独立页。 */
+      .profile { max-height: 320px; overflow: auto; padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+      .profile .profile-summary { font-size: 14.5px; line-height: 1.75; }
+      .profile .profile-summary b { color: var(--accent); font-weight: 600; }
+      .profile .profile-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+      .profile .ptag { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      .profile .ptag:first-child { border-color: rgba(229,72,77,.45); color: #ffb4b6; }
+      .profile .profile-metrics { display: flex; gap: 18px; color: var(--muted); font-size: 12px; }
+      .profile .profile-metrics b { color: var(--fg); font-size: 15px; font-weight: 600; margin-right: 3px; }
+      .profile .profile-more { color: var(--accent); font-size: 12.5px; text-decoration: none; align-self: flex-start; }
+      .profile .profile-more:hover { text-decoration: underline; }
 
       /* The song's facts first, then prose about the song, its artists and its
          album, each clamped to a few lines until clicked. */
@@ -459,10 +471,12 @@
               <div class="tabs" role="tablist">
                 <button id="tab-details" class="tab" type="button" role="tab" data-i18n="details">Details</button>
                 <button id="tab-lyrics" class="tab" type="button" role="tab" data-i18n="lyrics">Lyrics</button>
+                <button id="tab-profile" class="tab" type="button" role="tab" data-i18n="profile">Profile</button>
               </div>
             </div>
             <div class="details" id="details" role="tabpanel"><p class="hint">—</p></div>
             <div class="lyrics" id="lyrics" role="tabpanel" hidden><p class="hint">—</p></div>
+            <div class="profile" id="profile" role="tabpanel" hidden><p class="hint">—</p></div>
           </div>
         </section>
 
@@ -573,6 +587,13 @@
           mute: '静音',
           lyrics: '歌词',
           details: '详情',
+          profile: '画像',
+          profileFull: '看完整画像',
+          profileLoading: '正在读你的口味…',
+          profileEmpty: '还没有足够的播放记录，听几首再来看',
+          profileFailed: '画像没读出来，点这里重试',
+          profileHours: '小时',
+          profileTracks: '首',
           noDetails: '暂无这首歌的信息',
           album: '专辑',
           albumTracks: '{n} 首',
@@ -691,6 +712,13 @@
           mute: 'Mute',
           lyrics: 'Lyrics',
           details: 'Details',
+          profile: 'Profile',
+          profileFull: 'Full profile',
+          profileLoading: 'Reading your taste…',
+          profileEmpty: 'Not enough plays yet — listen to a few songs',
+          profileFailed: 'Could not load the profile; click to retry',
+          profileHours: 'h',
+          profileTracks: 'tracks',
           noDetails: 'No details for this song',
           album: 'Album',
           albumTracks: '{n} tracks',
@@ -1642,7 +1670,7 @@
 
       /** Reflect `infoView` in the tabs and the panes. */
       function paintInfoTabs() {
-        for (const view of ['details', 'lyrics']) {
+        for (const view of ['details', 'lyrics', 'profile']) {
           const on = infoView === view;
           $('tab-' + view).classList.toggle('on', on);
           $('tab-' + view).setAttribute('aria-selected', on ? 'true' : 'false');
@@ -1655,6 +1683,10 @@
        * pane is neither fetched nor painted, and catches up when it is shown.
        */
       function syncInfo(trackId) {
+        if (infoView === 'profile') {
+          renderProfile(false);
+          return;
+        }
         if (infoView === 'details') {
           if (trackId === detailsTrackId) return;
           detailsTrackId = trackId;
@@ -1672,6 +1704,54 @@
         }
       }
 
+      // ------------------------------------------------------------- profile
+      /** 面板里的画像只是摘要：一句话 + 标签 + 三个数，完整画像在独立页。 */
+      let profileLoadedAt = 0;
+      let profileBusy = false;
+      async function renderProfile(force) {
+        const pane = $('profile');
+        if (profileBusy) return;
+        if (!force && pane.dataset.ready === '1' && Date.now() - profileLoadedAt < 120000) return;
+        profileBusy = true;
+        pane.innerHTML = `<p class="hint">${esc(t('profileLoading'))}</p>`;
+        try {
+          const data = await api('/taste?range=4w');
+          const profile = data && data.profile ? data.profile : null;
+          const metrics = profile && profile.metrics ? profile.metrics : null;
+          if (!metrics || !metrics.plays) {
+            pane.dataset.ready = '0';
+            pane.innerHTML = `<p class="hint">${esc(t('profileEmpty'))}</p>`;
+            return;
+          }
+          const tags = (profile.tags || []).slice(0, 6);
+          const hours = Number(metrics.hours || 0).toFixed(1);
+          const chips = tags.map((tag) => {
+            const label = tag && typeof tag === 'object' ? tag.label : tag;
+            return `<span class="ptag">${esc(label || '')}</span>`;
+          }).join('');
+          pane.innerHTML = `
+            <p class="profile-summary">${esc(profile.summary || '')}</p>
+            <div class="profile-tags">${chips}</div>
+            <div class="profile-metrics">
+              <span><b>${esc(hours)}</b>${esc(t('profileHours'))}</span>
+              <span><b>${esc(metrics.tracks || 0)}</b>${esc(t('profileTracks'))}</span>
+              <span><b>${esc(metrics.avgBpm || '—')}</b> BPM</span>
+            </div>
+            <a class="profile-more" href="${esc(BASE)}/taste">${esc(t('profileFull'))} →</a>`;
+          pane.dataset.ready = '1';
+          profileLoadedAt = Date.now();
+        } catch {
+          pane.dataset.ready = '0';
+          pane.innerHTML = `<p class="hint">${esc(t('profileFailed'))}</p>`;
+        } finally {
+          profileBusy = false;
+        }
+      }
+
+      $('profile').onclick = () => {
+        if ($('profile').dataset.ready !== '1') renderProfile(true);
+      };
+
       function showInfo(view) {
         if (view === infoView) return;
         infoView = view;
@@ -1684,10 +1764,12 @@
           lyricLine = -1;
           paintLyrics();
         }
+        if (view === 'profile') renderProfile(false);
       }
 
       $('tab-details').onclick = () => showInfo('details');
       $('tab-lyrics').onclick = () => showInfo('lyrics');
+      $('tab-profile').onclick = () => showInfo('profile');
       paintInfoTabs();
 
       // The introduction's switch, or the written one itself, swaps it with
