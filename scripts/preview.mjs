@@ -46,30 +46,62 @@ const logger = {
  * selections visibly produce two different results. The first line says it is
  * fake; real model quality is only checked against a configured provider.
  */
-function fakeAnswer(request) {
+function promptText(request) {
   const content = request?.messages?.at(-1)?.content;
-  const prompt = Array.isArray(content)
+  return Array.isArray(content)
     ? content.map((block) => (typeof block === 'string' ? block : block?.text ?? '')).join('')
     : String(content ?? '');
-  const source = prompt.split(/\n{2,}/).pop() ?? '';
-  const lines = source
+}
+
+/** Take the lines inside `【要读的是这一段】` / `【这一次要处理的部分…】` sections. */
+function sectionLines(prompt, marker) {
+  const at = prompt.indexOf(marker);
+  if (at < 0) return [];
+  const rest = prompt.slice(at + marker.length);
+  const stop = rest.search(/\n【/);
+  let body = stop >= 0 ? rest.slice(0, stop) : rest;
+  // 标记行本身的尾巴（「，共 3 行】」）要丢掉，否则会被当成第一行歌词。
+  const close = body.indexOf('】');
+  if (close >= 0 && close < 40) body = body.slice(close + 1);
+  return body
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
-  const head = prompt.match(/连起来是"([^"]+)"/)?.[1] ?? '';
-  const strip = (line) => line.replace(/[，。！？、；：""''（）\s]/g, '').slice(0, 12);
+    .filter((line) => line && !line.startsWith('【'));
+}
+
+function fakeAnswer(request) {
+  const prompt = promptText(request);
+
+  if (prompt.includes('先只读、不改写')) {
+    const rows = sectionLines(prompt, '【要读的是这一段】');
+    return [
+      '（预览假模型：这段分析也是假的，只为验证两段式管道）',
+      '情绪：克制、怀旧',
+      `意象：${rows.slice(0, 3).map((line) => line.slice(0, 2)).join('、') || '灯、岸、船'}`,
+      `叙事：这 ${rows.length} 行在讲一段没有说完的旧事。`,
+    ];
+  }
+
+  const head = /(?:连起来是"|必须是「)([^"」]+)/.exec(prompt)?.[1] ?? '';
+  const source = sectionLines(prompt, '【这一次要处理的部分');
+  const lyricLines = source.length ? source : sectionLines(prompt, '【整首歌的歌词，只作背景】');
 
   if (head) {
     const chars = Array.from(head);
-    const filler = ['是', '在', '把', '又', '就'];
-    return [
-      '（预览假模型：按你的藏头首字生成，只验证管道）',
-      ...chars.map((char, index) => `${char}${filler[index % filler.length]}预览里的第 ${index + 1} 行`),
-    ];
+    // 藏头必须逐行首字对齐，所以不加任何说明行，也不重复已经以该字开头的词。
+    return chars.map((char, index) => {
+      const raw = lyricLines[index] || `第 ${index + 1} 行的词`;
+      const body = raw.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').replace(new RegExp(`^${char}+`), '');
+      return `${char}${body.slice(0, 10)}`;
+    });
   }
+
   const shape = '（预览假模型：下面每行都来自你这次选中的歌词，只验证管道）';
-  if (lines.length === 0) return [shape, '这次没有选中任何歌词。'];
-  return [shape, ...lines.slice(0, 7).map((line, index) => `第 ${index + 1} 句 · ${strip(line)}`)];
+  if (lyricLines.length === 0) return [shape, '这次没有选中任何歌词。'];
+  return [
+    shape,
+    ...lyricLines.slice(0, 7).map((line) => line.replace(/[，。！？；：]$/, '')),
+  ];
 }
 
 function makeFakeLlm() {

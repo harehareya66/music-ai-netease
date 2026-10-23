@@ -339,3 +339,21 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - **同一首诗的根因**：预览服务器 `scripts/preview.mjs` 的假模型是一段**写死的诗**（`风从西边来的时候…`），完全不看输入。现在改成「按输入回声」：改诗模式逐行回显你这次选中的歌词（最多 7 行），藏头模式用给定的首字逐字生成，第一行明确写「预览假模型：只为验证管道」。同一接口四次调用已能产生四种不同输出。
 - **真实的提示词缺陷**（换真模型也会差）：`lib/features.js:501 buildRemixPrompt()` 只把 `source.text` 塞进一句固定指令，不带歌名/歌手、不带全词上下文、不做任何分析；`lib/core/lyric.js:171 validateRemix()` 只查空/超长/行数/是否中文，查不出「和原词无关」。
 - **藏头设计错位**：把「藏头要藏什么」做成手输框，既不是从选中歌词来，也不校验每行首字是否真的拼出那句话；3 行选中 + 4 字藏头时更没有约束。
+
+## 21. P2 二创 v2：先读再写、可量化、藏头来自选中行（2026-10-23）
+
+用户反馈「选的歌词和输出驴头不对马嘴，所有歌都输出同一首诗，藏头应该是选歌词而不是打字」，核查后三条都成立：
+
+- **同诗**：`scripts/preview.mjs` 的假模型是写死的七行诗，完全无视输入 —— 这解释了预览里「哪首都是它」。已改成回声式假模型（只用于验证管道，首行标明「预览假模型」）。
+- **跑题**：`buildRemixPrompt` 旧版只把选段塞进一句固定指令，没有歌名/整首背景/分析，也没有任何检查。现在分两段：
+  - `buildAnalysisPrompt({track,fullText,selectedText})` → 「情绪 / 意象 / 叙事」三行；
+  - `buildRemixPrompt({mode,track,selectedText,fullText,lineCount,analysis,style,targetChars,extra})` → 带整首作背景、选中行数、analysis、硬约束（行数≈原文、复用原词 ≥3 处、不整句照抄、不写元话语、翻译输出英文）。
+- **可检查**：`lib/core/lyric.js` 新增 `normalizeForCompare` / `bigrams` / `overlapStats(source,answer)` / `extractHeads` / `acrosticReport(answer,targetChars)`。`features.remix()` 返回 `analysis / metrics{overlap,shared,total,echoes} / acrostic{ok,wanted,lines,mismatches} / warnings / retried`；批式路径在 `overlap < MIN_OVERLAP(0.15)` 或藏头错位时带纠正提示重试一次。
+- **藏头**：目标默认取**选中行首字**（`acrosticTarget(headChars, head, selectedLines)`），输入框只是覆盖入口，旁边加「用选中行首字」按钮；`headChars` 由页面传服务端，两个 remix 端点都读。
+- **页面**：右侧加「AI 怎么读这段」卡 + 一行 meta（重合度 / 复用 / 藏头是否对上 / 重试 / 模型 / 发送行数）+ warnings 红字；徽标对 `preview/*` 路由标「预览假模型（只验管道）」。
+- 顺手修：选了行再点模式按钮原先会 early-return 没反应，现在同模式但有选中时按选中重跑。
+
+## 验证
+- `test/remix.test.mjs` 8 例（归一化/双字/重合度、首字、藏头报错、目标来源、两个 prompt 的硬约束）；全部 **68/68**。
+- API：`POST /api/lyric/remix` 两段不同 selection → 文本不同、analysis 不同、metrics `0.44 / 0.56`、`retried:false`；藏头 `targetChars:"零固固"`、`acrostic.ok:true`。
+- CDP（页面）：选第 2/5/8 行（5 行）→ 点「改写成诗」→ `本次发送 5 行`、分析卡「这 5 行…」、meta `与原词重合 68% · 模型 preview/preview-model`；切「藏头」→ 输入框自动填 `零飘你我载`、meta `藏头对上了「零飘你我载」`。截图 `design/shots/mvp/lyric-analysis.png`、`lyric-acrostic.png`。
