@@ -187,3 +187,12 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 - `lib/ui/dev.html`：写接口一行改读 `dev.config.write.playlist`，开/关两种文案。
 - 测试新增 `test/scene-save.test.mjs` 6 例（本地模式不碰账号、建单+去重追加、开关关闭 → UNVERIFIED、空草稿 → EMPTY、默认标题、未登录 → NOT_SIGNED_IN），合计 **48/48**。
 - 真实账号 E2E：`POST /music/api/scene/save` 建成 `18514470039`（3 首）后立即 `removePlaylist` 删除；页面路径再建 `18514427272`（25 首）并删除——两次都没留垃圾歌单。
+
+## 10. 场景「试听全部」报 no playable track（2026-10-23 修复）
+
+用户点「试听全部」弹红条 `no playable track`，队列不换。
+
+- 根因：`lib/netease.js#songDetail()` 走 `/api/song/detail?ids=[...]`，该接口现在对即使单次请求也回 `405 操作频繁，请稍候再试`，`songs` 为空 → `/api/scene/preview` 认为没有可播曲目。
+- 修法：`songDetail()` 优先打 `/api/v3/song/detail?c=[{"id":...}]`（实测 3 首正常返回），失败再回落旧接口；两处都不行才返回空。
+- 顺手把 `/api/scene/preview` 的两条英文报错改成中文。
+- 实测：`POST /api/scene/preview {trackIds:[3 首]}` → `{queued:true,count:3}`、`state.playing=true`、`current=孤勇者`、`queue=3`；页面路径「生成 25 首 → 点试听全部」→ 服务端 `true/下雨天/25/index 0`、toast「已加入临时队列，共 25 首」、页面不跳转。
