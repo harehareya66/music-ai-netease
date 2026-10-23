@@ -328,7 +328,7 @@ music-plugin/                     # 仓库根目录（代码与文档同仓，�
 
 | # | 里程碑 | 产出 | 验收 | 工期 |
 |---|---|---|---|---|
-| **M0** | 基线与验证 | 原版跑通；4 个未知项结论（含 DJ 模型路由）；行为快照（工具返回样例、session.json 结构、面板交互清单）；验证脚本 `scripts/probe.mjs` | 四个结论有"可用/不可用"定论 —— 现状：V1/V2/V3 ✅（2026-10-23 探针实测），V4 待面板人工点一次「开始 DJ」 | 0.5-1d |
+| **M0** | 基线与验证 | 原版跑通；4 个未知项结论（含 DJ 模型路由）；行为快照（工具返回样例、session.json 结构、面板交互清单）；验证脚本 `scripts/probe.mjs` | 四个结论有"可用/不可用"定论 —— 现状：V1/V2/V3 ✅（2026-10-23 探针实测）；V4 ✅（真机 DS7：DJ 模型 pin 到 `deepseek-account/deepseek-flash` 后 `/api/dj/test` 返回 `source:"model"`；默认 session 模型若缺 key 会自动降级 heuristic） | 0.5-1d |
 | **M1** | 整形 | 改名（包名/BASE/`PANEL_CONTRACT` 双写点）、中文单语、cookie 0600、配置注释、留 DJ | 原版功能全在；`grep` 无残留旧名；cookie 属主权限 0600 | 1d |
 | **M2** | 数据层 | `session v2` + 迁移、账号历史接入（若通过）、history 出口、tags 缓存 | 单测全绿；A4 通过 | 2-3d |
 | **M3** | 决策层 | `taste.js`、`report.js`、`scene.js`（复用 DJ 池子）、排除规则 | 单测：画像/周报/场景各一组固定 fixture | 2-3d |
