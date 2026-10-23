@@ -158,3 +158,15 @@ node scripts/probe.mjs --write                               # 真建一张临�
 - CDP 实测：曲库播放中把 seek 拖到 50% → 浮空岛显示 `1:04 / 2:04`、`audio.currentTime=63`；随后打开 `/music/panel` → 新页面 `audio.currentTime=82`（接着放，不是 0）。
 - 布局：岛宽 `min(1240px, 100% - 32px)`，`1100/720` 两档收窄；1600 宽下时间/队列/音质/音量/播放器一行排开不挤压；900 宽自动两行。
 - 测试 38/38。
+
+## 8. 账号听歌记录接入画像（2026-10-23，M2 续）
+
+M0 的 V1 已证实 `weapi/v1/play/record` 可读（allData 100 首、weekData 0 首）。这一轮把它接进画像：
+
+- `lib/netease.js` 新增 `playRecord(uid)`：走 **music.163.com** 的 weapi（`clientlogusf` 只收日志，拿它请求会 404），返回 `{allData, weekData, code}`；每条是 `{playCount, score, song}`。
+- `lib/core/taste.js` 新增 `aggregateCounted(items, tagsById)`：按 `playCount` 当权重累计语言/年代/BPM/标签/艺人，`hours`、`nightShare`、`newRate` 一律为 `null`——账号记录没有时间轴，不编造；`buildAccountProfile()` 产出与本地画像同形的文档（`source:'account'`、`deltas:null`、`repeatRate:null`），`describeCounted()` 输出「账号累计 N 次播放、M 首，偏慢速、偏华语，最常听 X。」
+- `lib/features.js`：`accountItems()` 读并缓存账号记录 10 分钟（`accountCache`）；`taste({range:'all'})` 在账号可用且 ≥20 首时优先用账号画像，`dataSource` 标注「账号听歌记录（最近 100 首 · 累计播放次数，不含时间）」；缓存命中时不再把账号画像误标成「本机播放历史」。
+- 口径：**不混算**。近 4 周 / 近半年仍用本机历史（有时间和 playedMs），只有「全部」切到账号记录。
+- `lib/ui/taste.html`：`newRate`/`repeatRate` 为 null 时显示「—」，底部对比文案改成「账号记录只有累计值，没有上一周期」。
+- 实测（真实账号 喝水去喝水 uid 562295789）：`GET /music/api/taste?range=all&refresh=1` → `source:'account'`、plays 19095、tracks 100、avgBpm 103、topArtists 祖娅纳惜 1067 / YOASOBI 986 / 奇然 958；页面截图 `design/shots/mvp/taste-account.png`。
+- 新增 `test/taste-account.test.mjs` 4 个用例（权重累计、null 语义、排序、文案），测试 **42/42**。
