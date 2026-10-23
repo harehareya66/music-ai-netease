@@ -196,3 +196,13 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 - 修法：`songDetail()` 优先打 `/api/v3/song/detail?c=[{"id":...}]`（实测 3 首正常返回），失败再回落旧接口；两处都不行才返回空。
 - 顺手把 `/api/scene/preview` 的两条英文报错改成中文。
 - 实测：`POST /api/scene/preview {trackIds:[3 首]}` → `{queued:true,count:3}`、`state.playing=true`、`current=孤勇者`、`queue=3`；页面路径「生成 25 首 → 点试听全部」→ 服务端 `true/下雨天/25/index 0`、toast「已加入临时队列，共 25 首」、页面不跳转。
+
+## 11. 歌词二创流式输出（2026-10-23，S3）
+
+- 服务端：`lib/model.js` 新增 `streamText({llm, provider, model, sessionId, text, timeoutMs, onDelta})`，`collectStream(stream, { onDelta })` 在每个 `text-delta` 回吐；`lib/features.js#remix` 收到 `onDelta` 时走流式、否则仍走一次性 `generateText`。
+- 路由：`POST /music/api/lyric/remix/stream`，响应 `Content-Type: application/x-ndjson`、`X-Accel-Buffering: no`、`Cache-Control: no-store, no-transform`；每行一个 JSON：`{delta}` … `{done:true, remix}`；流已开始后出错只能写 `{error, code, text}` 再收尾，页面据此保留已生成部分。
+- 页面：`lib/ui/lyric.html#streamRemix` 用 `fetch` + `res.body.getReader()` + `TextDecoder` 逐行解析；每个 delta 直接写 `#remixBody`、badge 显示「正在生成… N 字」；点「重新生成」时**先清掉上一版**并显示「生成中」，失败且无部分内容时把上一版还回去——避免用户把旧文案当成新结果。
+- 预览：`scripts/preview.mjs --fake-llm` 提供假模型（每 700ms 一行，共 7 行），无需 API key 即可验流式。
+- 实测（CDP 采样每 400ms 读 `#remixBody.textContent.length`）：`[18,18,18,18,18,30,30,40,49,49,59,59,64,64]`，结束时 badge「DSH 模型生成 · 4.9s」、无报错；首个 delta 前约 2s 是服务端拉歌词 + 建 prompt 的固定开销。
+- 新增 `test/model.test.mjs` 4 例（delta 转发、streamText 路由与 trim、无路由返回 null、失败时已转发 delta 不丢），测试 **52/52**。
+- 踩坑：往 HTML 内联 JS 里插 `\n` 被写成真实换行导致整页 `SyntaxError: Invalid or unexpected token`；此后一律用 `String.fromCharCode(10)` 或 `--check` 前先抽脚本验证。

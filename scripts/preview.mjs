@@ -5,6 +5,7 @@
  *   node scripts/preview.mjs                      # 临时空数据目录（未登录）
  *   node scripts/preview.mjs --data-dir %USERPROFILE%\.dsh\music
  *   node scripts/preview.mjs --port 7788 --keep    # 固定端口，Ctrl-C 退出
+ *   node scripts/preview.mjs --fake-llm            # 挂一个假模型，验证二创流式
  *
  * 输出的 URL 直接贴浏览器：
  *   /music/panel  播放器      /music/taste   画像
@@ -31,12 +32,41 @@ const flag = (name) => {
 };
 const PORT = Number(flag('--port')) || 0;
 const DATA_DIR = typeof flag('--data-dir') === 'string' ? flag('--data-dir') : null;
+const FAKE_LLM = Boolean(flag('--fake-llm'));
 
 const logger = {
   info: (...parts) => console.log('[music]', ...parts),
   warn: (...parts) => console.warn('[music]', ...parts),
   debug: () => {},
 };
+
+/**
+ * A stand-in LLM for previewing the streaming remix page: answers with a short
+ * poem in chunks, so the page can be checked without a provider key.
+ */
+function makeFakeLlm() {
+  const poem = [
+    '风从西边来的时候，',
+    '你没有把那句话说完。',
+    '夜航的人不看海，',
+    '只看灯一盏一盏地，',
+    '替你把岸边点亮。',
+    '如果明天还有明天，',
+    '我就把今晚折成一只船。',
+  ];
+  return {
+    listProviders: () => [{ id: 'preview' }],
+    listModels: async () => [{ id: 'preview-model' }],
+    stream: () => (async function* generate() {
+      for (const line of poem) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        yield { type: 'text-delta', text: `${line}
+` };
+      }
+      yield { type: 'finish', reason: { kind: 'stop' } };
+    })(),
+  };
+}
 
 function mount(dataDir) {
   const cleanups = [];
@@ -53,9 +83,9 @@ function mount(dataDir) {
       },
     },
     effect: (fn) => cleanups.push(fn()),
-    get: () => undefined,
+    get: (name) => (FAKE_LLM && name === 'llm' ? makeFakeLlm() : undefined),
   };
-  apply(ctx, { dataDir, requestTimeoutMs: 20_000 });
+  apply(ctx, { dataDir, requestTimeoutMs: 20_000, write: { playlist: true } });
   return { ctx, tools, handler: routeHandler, cleanups };
 }
 

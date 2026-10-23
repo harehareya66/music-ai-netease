@@ -541,6 +541,54 @@
     $('#copy').disabled = !(state.remix && state.remix.text);
   }
 
+
+  /* 流式二创：服务端按行回 JSON，边到边画。失败时保留已生成的部分，重试不丢输入。 */
+  async function streamRemix(body, onPartial){
+    var res = await fetch('__BASE__/api/lyric/remix/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      var data = null;
+      try { data = await res.json(); } catch (e) { data = null; }
+      var err = new Error((data && data.error) || ('请求失败（' + res.status + '）'));
+      err.status = res.status;
+      err.code = data && data.code;
+      throw err;
+    }
+    if (!res.body || !res.body.getReader) {
+      var whole = await res.json();
+      return whole && whole.remix;
+    }
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var done = null;
+    for (;;) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var cut;
+      while ((cut = buffer.indexOf(String.fromCharCode(10))) >= 0) {
+        var line = buffer.slice(0, cut).trim();
+        buffer = buffer.slice(cut + 1);
+        if (!line) continue;
+        var msg = null;
+        try { msg = JSON.parse(line); } catch (e) { continue; }
+        if (msg.delta) onPartial(msg.delta);
+        if (msg.error) {
+          var failure = new Error(msg.error);
+          failure.code = msg.code;
+          failure.partial = msg.text || '';
+          throw failure;
+        }
+        if (msg.done) done = msg.remix;
+      }
+    }
+    return done;
+  }
+
   async function requestRemix(opts){
     opts = opts || {};
     if (!state.lines.length || state.loadingLyrics) return;
@@ -556,20 +604,41 @@
     state.remixScope = scope;
     hideError();
     setRemixBusy(true);
-    if (!state.remix) renderRemixPlaceholder('生成中', '模型正在把歌词改写成' + (MODE_LABEL[state.mode] || '别的形式') + '…');
+    var partial = '';
+    var started = Date.now();
+    var previous = state.remix;
+    /* 先清掉上一版，免得用户以为旧文案就是这次的结果；失败时再还回去。 */
+    state.remix = null;
+    renderRemixPlaceholder('生成中', '模型正在把歌词' + (MODE_LABEL[state.mode] || '改写') + '…');
     try {
-      var data = await request('__BASE__/api/lyric/remix', {
-        method: 'POST',
-        body: JSON.stringify(body)
+      var remix = await streamRemix(body, function(delta){
+        partial += delta;
+        state.remix = { mode: state.mode, text: partial, elapsedMs: Date.now() - started, route: null, streaming: true };
+        var box = $('#remixBody');
+        box.textContent = partial;
+        var badge = $('#remixBadge');
+        if (badge) {
+          badge.hidden = false;
+          badge.textContent = '正在生成… ' + fmt(partial.length) + ' 字';
+        }
       });
-      var remix = data && data.remix;
       if (!remix || !String(remix.text || '').trim()) throw new Error('模型没有返回可用内容，请重试');
       state.remix = remix;
       renderRemix();
     } catch (err) {
-      showError(err && err.message ? err.message : '生成失败，请重试');
-      if (!state.remix) {
-        renderRemixPlaceholder('这次没生成出来', '可以重新生成，或者换一种改写方式。');
+      var saved = (err && err.partial) || partial;
+      if (saved) {
+        state.remix = { mode: state.mode, text: saved, elapsedMs: Date.now() - started, route: null };
+        renderRemix();
+      }
+      showError((err && err.message ? err.message : '生成失败，请重试') + (saved ? '（已保留生成到的部分，可直接重试）' : ''));
+      if (!saved) {
+        if (previous && previous.text) {
+          state.remix = previous;
+          renderRemix();
+        } else {
+          renderRemixPlaceholder('这次没生成出来', '可以重新生成，或者换一种改写方式。');
+        }
       }
     } finally {
       setRemixBusy(false);
