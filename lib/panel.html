@@ -165,25 +165,25 @@
       .link:hover:not(:disabled) { background: none; color: var(--fg); }
 
       /* ------------------------------------------------------------- stage */
-      .np { display: flex; gap: 18px; align-items: flex-end; }
+      .np { display: flex; gap: 26px; align-items: flex-end; }
       /* The frame holds the place, with a note in it, while there is no cover. */
       .cover {
-        position: relative; width: clamp(96px, 22vw, 180px); aspect-ratio: 1; flex: none;
-        border-radius: var(--radius); overflow: hidden; background: var(--panel);
+        position: relative; width: clamp(112px, 24vw, 264px); aspect-ratio: 1; flex: none;
+        border-radius: 16px; overflow: hidden; background: var(--panel);
         display: grid; place-items: center; color: var(--faint); font-size: 40px;
-        box-shadow: 0 6px 24px color-mix(in srgb, #000 14%, transparent);
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.46);
       }
       #cover-icon { display: grid; place-items: center; width: 38%; height: 38%; }
       #cover-icon svg.i { width: 100%; height: 100%; stroke-width: 1.5; }
       #cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .np-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-      .now-title { font-size: 22px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-      .now-artists { font-size: 14px; }
-      .now-album { color: var(--muted); }
+      .now-title { font-size: 27px; font-weight: 700; line-height: 1.24; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+      .now-artists { font-size: 14.5px; }
+      .now-album { color: var(--muted); font-size: 12.5px; }
       /* What to do about this track: the taste switchers and the boosts. A
          state is an accent icon on a tint, never a solid block — the only
          filled control on the stage is play. */
-      .taste { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+      .taste { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
       .taste button {
         width: 34px; height: 34px; padding: 0; border-radius: 50%; display: grid; place-items: center;
         background: none; color: var(--muted);
@@ -191,21 +191,22 @@
       .taste button:hover:not(:disabled) { color: var(--fg); background: var(--hover); }
       .taste button.on { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
 
-      .progress { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .progress { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
       input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; border: 0; padding: 0; height: 16px; flex: 1; min-width: 0; }
-      input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 16%, transparent); }
-      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: var(--accent); }
+      input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 14%, transparent); }
+      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; margin-top: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.14); }
       input[type="range"]:focus { outline: none; }
 
-      .transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
+      .transport { display: flex; align-items: center; justify-content: center; gap: 20px; }
       .transport button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: none; border-color: transparent; }
       .transport button:hover:not(:disabled) { background: var(--hover); }
-      .transport #play { width: 52px; height: 52px; background: var(--accent); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+      .transport #play { width: 58px; height: 58px; background: var(--accent); color: #fff; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 42%, transparent); }
       .transport #play:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
       .transport svg.i { width: 20px; height: 20px; }
-      .transport #play svg.i { width: 22px; height: 22px; }
+      .transport #play svg.i { width: 24px; height: 24px; }
 
-      .secondary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+      .secondary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px;
+        border-top: 1px solid var(--line); padding-top: 10px; }
       .secondary select, .secondary > button { padding: 4px 8px; font-size: 12px; }
       #quality-info { color: var(--muted); }
       .volume-control { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -234,15 +235,18 @@
       .lyrics p.on { color: var(--fg); font-weight: 600; }
 
       /* 画像摘要：面板里只放一句话 + 标签 + 三个数，完整画像在独立页。 */
-      .profile { max-height: 320px; overflow: auto; padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 12px; }
-      .profile .profile-summary { font-size: 14.5px; line-height: 1.75; }
+      .profile { max-height: 320px; overflow: auto; padding: 8px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+      .profile .profile-summary { font-size: 15.5px; line-height: 1.85; }
       .profile .profile-summary b { color: var(--accent); font-weight: 600; }
       .profile .profile-tags { display: flex; flex-wrap: wrap; gap: 8px; }
       .profile .ptag { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
       .profile .ptag:first-child { border-color: rgba(229,72,77,.45); color: #ffb4b6; }
-      .profile .profile-metrics { display: flex; gap: 18px; color: var(--muted); font-size: 12px; }
-      .profile .profile-metrics b { color: var(--fg); font-size: 15px; font-weight: 600; margin-right: 3px; }
-      .profile .profile-more { color: var(--accent); font-size: 12.5px; text-decoration: none; align-self: flex-start; }
+      .profile .profile-metrics { display: flex; gap: 10px; color: var(--muted); font-size: 12px; }
+      .profile .profile-metrics span { border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; background: rgba(255, 255, 255, 0.02); }
+      .profile .profile-metrics b { color: var(--fg); font-size: 18px; font-weight: 650; margin-right: 4px; font-variant-numeric: tabular-nums; }
+      .profile .profile-more { color: var(--accent); font-size: 12.5px; text-decoration: none; align-self: flex-start;
+        border: 1px solid rgba(229, 72, 77, 0.4); border-radius: 999px; padding: 5px 14px; }
+      .profile .profile-more:hover { background: var(--accent-soft); text-decoration: none; }
       .profile .profile-more:hover { text-decoration: underline; }
 
       /* The song's facts first, then prose about the song, its artists and its
@@ -297,7 +301,9 @@
       }
 
       /* -------------------------------------------------------------- side */
-      .dj-card { padding-bottom: 12px; flex: none; }
+      .dj-card { padding-bottom: 12px; flex: none;
+        border-color: rgba(229, 72, 77, 0.34);
+        box-shadow: 0 0 0 1px rgba(229, 72, 77, 0.08), 0 10px 30px rgba(0, 0, 0, 0.24); }
       .dj-card .card-head { padding-bottom: 8px; }
       .dj-card .card-head .title { color: var(--fg); font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: 0; }
       .dj-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px; font-size: 12px; }
@@ -357,13 +363,13 @@
 
       .queue-card { display: flex; flex-direction: column; overflow: hidden; }
       #queue { padding: 0 6px 6px; }
-      .row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; cursor: pointer; }
+      .row { display: flex; align-items: center; gap: 11px; padding: 7px 8px; border-radius: 10px; cursor: pointer; }
       .row:hover { background: var(--hover); }
-      .row.playing { background: var(--accent-soft); }
+      .row.playing { background: linear-gradient(90deg, var(--accent-soft), transparent 84%); }
       .row.playing .name { color: var(--accent); font-weight: 600; }
       .row .idx { width: 20px; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; }
       .row.playing .idx { color: var(--accent); display: grid; justify-items: end; }
-      .row img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex: none; background: var(--panel); }
+      .row img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex: none; background: var(--panel); }
       .row .meta { min-width: 0; flex: 1; }
       .row .name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .row .sub { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -371,7 +377,7 @@
       .row .dur { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; min-width: 32px; text-align: right; }
       .row .acts { display: none; gap: 4px; flex: none; }
       .row .acts button { padding: 3px 5px; background: none; color: var(--muted); }
-      .row .acts button:hover:not(:disabled) { color: var(--fg); }
+      .row .acts button:hover:not(:disabled) { color: var(--accent); }
       .row:hover .acts { display: flex; }
       /* The list's own like control. A liked track keeps its filled heart
          visible; the hollow one only appears on hover, so an unrated list is
@@ -640,8 +646,9 @@
           gesturePlay: '点击播放',
           gestureNote: '在窗口任意处点击也可以',
           queueEmpty: '队列为空，用 AI DJ 或让助手补歌',
-          remove: '移除',
-          removed: '已移除',
+          remove: '移出队列',
+          removed: '已移出队列',
+          removeHint: '移出队列（没评过级的歌会顺手记一次不喜欢）',
           clearQueue: '清空',
           clearQueueTitle: '清空队列，保留正在播放的歌曲；不会给歌曲打分',
           loading: '加载中…',
@@ -765,8 +772,9 @@
           gesturePlay: 'Play',
           gestureNote: 'clicking anywhere works too',
           queueEmpty: 'Queue empty — use the AI DJ or ask the assistant to add songs',
-          remove: 'Remove',
-          removed: 'Removed',
+          remove: 'Remove from queue',
+          removed: 'Removed from queue',
+          removeHint: 'Remove from queue (also records a dislike if unrated)',
           clearQueue: 'Clear',
           clearQueueTitle: 'Clear the queue, keeping the song playing; no song is rated',
           loading: 'Loading…',
@@ -1095,7 +1103,13 @@
        */
       function failureText(error) {
         if (error.code === 'ANONYMOUS') return t('likeNeedsSignIn');
-        return error.message;
+        // 服务端有几处英文错误直出（not found / method not allowed 等），
+        // 面板是中文单语产品，这里统一收口成能读的一句话。
+        const message = String(error.message || '');
+        if (/not found/i.test(message)) return '没找到这首歌，可能已下架或需要换一首';
+        if (/method not allowed/i.test(message)) return '这个操作服务端不支持';
+        if (/unauthor/i.test(message)) return '登录状态失效了，去面板重新扫码';
+        return message;
       }
 
       // ------------------------------------------------------------- transport
@@ -1435,7 +1449,7 @@
               ${track.vip ? '<span class="tag">VIP</span>' : ''}
               <button class="heart ${track.liked ? 'on' : ''}" data-like="${index}" title="${esc(t(track.liked ? 'unlike' : 'like'))}">${icon('heart', { filled: track.liked, small: true })}</button>
               <span class="dur">${fmt(track.duration)}</span>
-              <span class="acts"><button data-remove="${index}" title="${esc(t('remove'))}">${icon('x', { small: true })}</button></span>
+              <span class="acts"><button data-remove="${index}" title="${esc(t('removeHint'))}">${icon('x', { small: true })}</button></span>
             </div>`;
           })
           .join(''));
@@ -1730,7 +1744,7 @@
             return `<span class="ptag">${esc(label || '')}</span>`;
           }).join('');
           pane.innerHTML = `
-            <p class="profile-summary">${esc(profile.summary || '')}</p>
+            <p class="profile-summary">${esc(profile.summary || '').replace(/(\d+(?:\.\d+)?%?)/g, '<b>$1</b>')}</p>
             <div class="profile-tags">${chips}</div>
             <div class="profile-metrics">
               <span><b>${esc(hours)}</b>${esc(t('profileHours'))}</span>
@@ -1883,7 +1897,7 @@
           setTimeout(afterDetails);
         } catch (error) {
           if (request !== detailsRequest) return;
-          $('details').innerHTML = `<p class="hint">${esc(error.message)}</p>`;
+          $('details').innerHTML = `<p class="hint">${esc(failureText(error))}</p>`;
         }
       }
 
@@ -2421,7 +2435,7 @@
         }
         const kbps = last.br ? ` · ${Math.round(last.br / 1000)} kbps` : '';
         setText($('quality-info'),
-          `▶ ${String(last.type ?? '').toUpperCase()}${kbps}` + (last.downgraded ? ` (${last.served}, ${t('downgraded')})` : ''));
+          `▶ ${String(last.type ?? '').toUpperCase()}${kbps}` + (last.downgraded ? `（${qualityLabel({ id: last.served })}, ${t('downgraded')}）` : ''));
       }
 
       async function loadQuality() {
