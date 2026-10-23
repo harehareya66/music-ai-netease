@@ -246,3 +246,13 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 - CDP：播放/暂停/下一首 `playing false→true→index 0→1→false`；不喜欢后 `queue 30→29`、`current 够钟→初恋`。
 - `node scripts/check-panel.mjs` 全过；`node --test` 54/54；1600 / 1100 两档截图无溢出。
 - 新增 `VERIFY.md`：S3-S6 的人工验收清单（逐步勾选），地址与启动命令都写在开头。
+
+## 15. S7 装进 DSH desktop profile（2026-10-23）
+
+- 打包：`npm pack` → `ncm-plugin-0.1.0.tgz`（约 237KB，37-38 个文件，含 lib/ui、lib/tools、vendor）。
+- 安装方式（和 dsh-push-index 同一条路，不用插件市场）：
+  1. tarball 拷到 `~/.dsh/profiles/desktop/packages/ncm-plugin-0.1.0.tgz`（备份了 `package.json.bak-ncm`）；
+  2. profile `package.json`：`dependencies["ncm-plugin"] = "file:./packages/ncm-plugin-0.1.0.tgz"`，并把 `ncm-plugin` 追加进 `dsh.profile.bundles`（33 项）；
+  3. 用 DSH 自带 pnpm（`C:\Users\19825\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\bin\pnpm.mjs`，v11.28.5）在 profile 目录 `install --prefer-offline`：`+ ncm-plugin 0.1.0`，3.5s 完成；其余插件（dsh-pet / genui / billion-context / cc-safety-net / dsh-ops / modsearch）逐个确认还在。
+- 登录态迁移：把 `%TEMP%\ncm-demo\session.json`（cookie 937B、账号 喝水去喝水 uid 562295789、历史 220 条）复制到 `~/.dsh/music/session.json`，`cache/tags.json` 复制到 `~/.dsh/music/cache/tags.json`，装上即可直接是登录态，无需重新扫码。
+- 待办：用户重启 DSH 后验 V4 真模型（DJ plan）、A1 音质真实切换、A2 切会话不断音、A3 队列操作；结论回填本文件与 PLAN §6.4。

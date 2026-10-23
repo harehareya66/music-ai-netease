@@ -29,7 +29,7 @@ DSH 的网易云音乐插件：播放器 + 侧栏面板 + AI 对话控制，外�
 
 ```powershell
 cd music-plugin
-node --test --test-isolation=none "test/*.test.mjs"   # 48 个用例，纯离线
+node --test --test-isolation=none "test/*.test.mjs"   # 54 个用例，纯离线
 node scripts/preview.mjs --keep                       # 本地预览五屏（不装 DSH 也能看）
 node scripts/fixture.mjs --out "$env:TEMP\ncm-demo"   # 造一份演示数据（看有数据的样子）
 node scripts/preview.mjs --data-dir "$env:TEMP\ncm-demo" --port 7789 --keep
@@ -47,7 +47,28 @@ M0 结论、逐项功能自检（六页 + 六个 API + 场景草稿）、六页�
 插件包名 `ncm-plugin`，零运行时依赖、无构建步骤，`lib/index.js` 是入口，`cordis.patch.yml` 是 bundle patch。装法二选一：
 
 1. **插件市场**：把本目录打成 tarball（`npm pack`，产出 `ncm-plugin-0.1.0.tgz`），用 DSH 设置里的插件安装入口装本地包，然后重启 DSH。
-2. **手动**：把本目录放到 `~/.dsh/profiles/desktop/node_modules/ncm-plugin`（或 `npm install <本目录>`），在 profile 的插件配置里启用 `ncm-plugin`，重启。
+2. **手动（桌面 profile 已按这条路装过一次）**：
+
+   ```powershell
+   $profile = "$env:USERPROFILE\.dsh\profiles\desktop"
+   New-Item -ItemType Directory -Force "$profile\packages" | Out-Null
+   Copy-Item ncm-plugin-0.1.0.tgz "$profile\packages\" -Force
+
+   # package.json 里加一行依赖 + 把 ncm-plugin 追加进 dsh.profile.bundles
+   #   "ncm-plugin": "file:./packages/ncm-plugin-0.1.0.tgz"
+   #   "bundles": ["@deepseek-ai/dsh-base", ..., "dsh-push-index", "ncm-plugin"]
+
+   node <pnpm.mjs> install --prefer-offline    # 用 DSH 自带的 pnpm
+   ```
+
+   然后**完全退出并重启 DSH**。登录态可以从预览目录搬过来，省一次扫码：
+
+   ```powershell
+   Copy-Item "$env:TEMP
+cm-demo\session.json" "$env:USERPROFILE\.dsh\music\session.json" -Force
+   ```
+
+   没搬也没关系，装上后在面板右上「登录」扫码即可；之后所有会话共用 `~/.dsh/music/session.json`。
 
 装好后：侧栏出现「音乐」，面板顶部有 `曲库 / 画像 / 周报 / 场景 / 歌词二创 / 检查台` 六个入口；对话里可用 `music_search`、`music_play`、`music_dj`、`scene_build`、`taste_profile`、`weekly_report`、`lyric_remix` 等 13 个工具。
 
