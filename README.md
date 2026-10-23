@@ -15,18 +15,21 @@ DSH 的网易云音乐插件：播放器 + 侧栏面板 + AI 对话控制，外�
 - [x] 聚合层：`lib/features.js`（画像/周报/场景/歌词/二创）、`lib/model.js`（LLM 取用）、`lib/tagstore.js`（标签缓存）
 - [x] 13 个工具（旧 7 + 新 6）与 5 个独立页（`/music/{library,taste,weekly,scene,lyric}`）
 - [x] 曲库页：登录后看自建/收藏歌单、最近播放、每日推荐；点歌单出曲目列表，点行即播（H5 登录后「没有歌单」的反馈补的）
-- [x] 端到端冒烟：`node --test` 38/38（含 apply 挂载、13 工具、页面路由、API 空态、检查台）
+- [x] 端到端冒烟：`node --test` 48/48（含 apply 挂载、13 工具、页面路由、API 空态、检查台、账号画像、歌单写入）
 - [x] 制作者检查台 `/music/dev`：环境事实 + M0 探针结论 + 12 项功能自检 + 六页入口 + 人工清单
 - [x] 交互（10-23）：面板加「开始 DJ」按钮并等 plan 回执；歌单默认 18 张 +「显示全部」；底部浮空岛 `lib/ui/mini.js` 在六页共享播放条——播放/切歌不离开当前页，壳里只遥控、纯 H5 自己接管音频
 - [ ] **M0 真实账号验证**：V1 ✅ 可读 / V2 ✅ 可用 / V3 ✅ 可用（2026-10-23 探针实测，临时歌单已自动删除）；剩 **V4** 需人在面板点一次「开始 DJ」
 - [ ] M1 剩余：面板文案已强制中文，改名与 qrcode 常量双写检查待做
-- [ ] M5/M6：五屏与概念稿的视觉对齐、写歌单落地（依赖 V2/V3）、打包发布
+- [x] 画像「全部」接账号听歌记录（累计次数加权，无时间戳的指标留空，见 NOTES §8）
+- [x] 写歌单落库：`playlist/create` + `playlist/manipulate/tracks` 接进场景页「存到我的网易云歌单」，失败不静默降级（NOTES §9）
+- [ ] M5 剩余：面板本体与概念稿的视觉对齐（页签、底栏、队列行）
+- [ ] M6 剩余：二创流式、装进 DSH 后验 V4/A1/A2/A3、发布收尾
 
 ## 跑起来
 
 ```powershell
 cd music-plugin
-node --test --test-isolation=none "test/*.test.mjs"   # 38 个用例，纯离线
+node --test --test-isolation=none "test/*.test.mjs"   # 48 个用例，纯离线
 node scripts/preview.mjs --keep                       # 本地预览五屏（不装 DSH 也能看）
 node scripts/fixture.mjs --out "$env:TEMP\ncm-demo"   # 造一份演示数据（看有数据的样子）
 node scripts/preview.mjs --data-dir "$env:TEMP\ncm-demo" --port 7789 --keep

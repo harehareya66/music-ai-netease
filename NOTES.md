@@ -170,3 +170,20 @@ M0 的 V1 已证实 `weapi/v1/play/record` 可读（allData 100 首、weekData 0
 - `lib/ui/taste.html`：`newRate`/`repeatRate` 为 null 时显示「—」，底部对比文案改成「账号记录只有累计值，没有上一周期」。
 - 实测（真实账号 喝水去喝水 uid 562295789）：`GET /music/api/taste?range=all&refresh=1` → `source:'account'`、plays 19095、tracks 100、avgBpm 103、topArtists 祖娅纳惜 1067 / YOASOBI 986 / 奇然 958；页面截图 `design/shots/mvp/taste-account.png`。
 - 新增 `test/taste-account.test.mjs` 4 个用例（权重累计、null 语义、排序、文案），测试 **42/42**。
+
+## 9. 歌单落库（2026-10-23，M6）
+
+M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用，于是把「存到我的歌单」从置灰接到真实写入。
+
+- `lib/netease.js` 新增三个写入方法，共用私有 `#weapiPost()`（带登录 cookie + csrf 的加密 POST，走 `music.163.com`）：
+  - `createPlaylist(name)` → `{id, name}`（`/weapi/playlist/create`）；
+  - `addPlaylistTracks(playlistId, trackIds)`（`op:'add'`，`trackIds` 是 JSON 字符串）；
+  - `removePlaylist(playlistId)` → `/weapi/playlist/remove`（`playlist/delete` 会 400，M0 踩过）。
+  - 未登录时本地就抛 `NOT_SIGNED_IN`，不发请求。
+- `lib/features.js#saveScene`：账号模式改为「建单 → 追加曲目」，返回 `playlistId`；失败向上抛，由路由映射状态码。
+- `lib/index.js`：`write.playlist` 默认 **true**（显式设 false 才回到 501 门禁），并在注释里写明依据是 M0 探针。
+- `lib/router.js`：`FEATURE_STATUS` 增 `NOT_SIGNED_IN:401`、`BAD_NAME:400`、`BAD_ARGS:400`。
+- `lib/ui/scene.html`：主按钮改「存到我的网易云歌单」，副按钮「只存本地」；提示「会写进你的网易云账号『我的歌单』，随时可删；没登录或写入失败时不会静默改成本地」；401 时提示先去面板扫码；保存后用 `scrollIntoView` 把结果提示滚进视野（浮空岛会挡住页面底部）。
+- `lib/ui/dev.html`：写接口一行改读 `dev.config.write.playlist`，开/关两种文案。
+- 测试新增 `test/scene-save.test.mjs` 6 例（本地模式不碰账号、建单+去重追加、开关关闭 → UNVERIFIED、空草稿 → EMPTY、默认标题、未登录 → NOT_SIGNED_IN），合计 **48/48**。
+- 真实账号 E2E：`POST /music/api/scene/save` 建成 `18514470039`（3 首）后立即 `removePlaylist` 删除；页面路径再建 `18514427272`（25 首）并删除——两次都没留垃圾歌单。

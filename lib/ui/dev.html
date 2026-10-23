@@ -191,7 +191,7 @@
         <li><b>A2 切会话不断音</b> <span>播放中在 DSH 里新开/切换会话，音乐不停；回面板状态一致。</span></li>
         <li><b>A3 队列</b> <span>点单曲「插到下一首」→ 队列顺序真的变了；点「清空」→ 播放停止、队列空。</span></li>
         <li><b>A5 登录</b> <span>退出登录 → 曲库显示「还没有登录网易云」；扫码后曲库出现自建/收藏歌单。</span></li>
-        <li><b>A6 场景</b> <span>「下雨天的下午，别太吵」→ 草稿贴合场景；「只存本地」成功；「存到我的歌单」保持置灰（写接口未验证）。</span></li>
+        <li><b>A6 场景</b> <span>「下雨天的下午，别太吵」→ 草稿贴合场景；「只存本地」成功；「存到我的网易云歌单」会真实建单（验证后可删）。</span></li>
         <li><b>A7 周报</b> <span>周报数字与「这一周，你」文案一致；0 分钟的日子有底线；切「上周」能算出来。</span></li>
         <li><b>A9 合规</b> <span>全程不解灰 VIP；面板与检查台都不显示 cookie；网络面板里歌单写操作只出现在本地。</span></li>
       </ol>
@@ -291,9 +291,9 @@
         ' · ' + (dev.scrobble.active ? '正在上报' : '空闲') +
         (dev.scrobble.last ? ' · 上次 ' + esc(dev.scrobble.last) : '')
       : '—']);
-    rows.push(['写接口', dev.config && dev.config.write
-      ? '<span class="pill warn">配置已开</span> <span class="mono">' + esc(JSON.stringify(dev.config.write)) + '</span>'
-      : '<span class="pill">未开</span> 歌单写操作仍返回 501：M0 已验证接口可用，M6 再接真实落库']);
+    rows.push(['写接口', dev.config && dev.config.write && dev.config.write.playlist
+      ? '<span class="pill ok">已开</span> 场景草稿点「存到我的网易云歌单」会真实写入账号（M0 V2/V3 已验证）'
+      : '<span class="pill">关闭</span> 歌单写入被 <span class="mono">write.playlist</span> 关掉，账号保存返回 501，只能存本地']);
     rows.push(['探针', probe
       ? '<span class="pill ' + (probe.failed && probe.failed.length ? 'no' : 'ok') + '">' +
         (probe.failed && probe.failed.length ? '有未通过项' : '已跑') + '</span> ' + esc(when(probe.finishedAt || probe.startedAt))
