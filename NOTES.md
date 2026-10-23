@@ -256,3 +256,19 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
   3. 用 DSH 自带 pnpm（`C:\Users\19825\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\bin\pnpm.mjs`，v11.28.5）在 profile 目录 `install --prefer-offline`：`+ ncm-plugin 0.1.0`，3.5s 完成；其余插件（dsh-pet / genui / billion-context / cc-safety-net / dsh-ops / modsearch）逐个确认还在。
 - 登录态迁移：把 `%TEMP%\ncm-demo\session.json`（cookie 937B、账号 喝水去喝水 uid 562295789、历史 220 条）复制到 `~/.dsh/music/session.json`，`cache/tags.json` 复制到 `~/.dsh/music/cache/tags.json`，装上即可直接是登录态，无需重新扫码。
 - 待办：用户重启 DSH 后验 V4 真模型（DJ plan）、A1 音质真实切换、A2 切会话不断音、A3 队列操作；结论回填本文件与 PLAN §6.4。
+
+## 16. S7 真机（DSH desktop profile）验证记录（2026-10-23）
+
+装好后首次启动崩溃：`web boot: 1 entry did not activate` + `ncm-plugin: import failed`，renderer console 最后一行是 `client-modules: duplicate factory registration for "@doitian/dsh-music" (bundle executed twice without invalidate?)`。
+
+- 根因：fork 保留了基座的 client 模块 id。宿主按**包名**加载 client、按**模块 id** 去重，`id` 与包名不一致时同一 bundle 执行两次，第二次注册抛错，web boot 失败。
+- 修复：`lib/client.js` 的 `id` 改为 `'ncm-plugin'`（必须等于包名），版本 0.1.1，重新打包并重装进 `~/.dsh/profiles/desktop`。
+- 卡巴斯基只报了「勿扰模式 已开启/已关闭」，没有任何拦截记录；当时的 `spawn EPERM` 是我自己起了第二个 DSH 实例导致的，退出重启后恢复。
+
+真机实测（DSH GUI 端口 64456，dataDir `C:\Users\19825\.dsh\music`）：
+
+- `GET /music/panel` 200；`/music/health`：panelContract 2、authenticated、账号 喝水去喝水 uid 562295789 VIP、13 工具齐全、audio last hires FLAC 1,829,357 bps。
+- **V4 通过**：默认 session model 是 `deepseek-official/deepseek-flash`，该路由没有凭据（`MISSING_CREDENTIAL: no API key for provider route "deepseek-official"`），DJ 自动降级 heuristic。在面板里把 DJ 模型 pin 到 `deepseek-account/deepseek-flash` 后，`POST /music/api/dj/test` 返回 `{source:'model', route:'deepseek-account/deepseek-flash', vibe:'深夜emo的克制伤感', picked:['富士山下 — 陈奕迅']}` —— **真模型出 plan 成功**。
+- **A1 音质档**：`POST /music/api/quality {level:'exhigh'}` → `served:'exhigh', br:320000, type:'mp3', downgraded:true`；再切回 `hires` 恢复正常。
+- **A2 切会话不断音（机制层）**：无任何页面打开时，`/api/state.reported` 的 position 在 6 秒内前进 6499ms（引擎在壳里，不依赖页面）。
+- 队列 A3：`insert` 200（下一首插入成功）、`remove` 200，均在真机接口上验证。
