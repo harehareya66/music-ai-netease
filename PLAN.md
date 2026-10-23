@@ -294,13 +294,16 @@ music-plugin/                     # 仓库根目录（代码与文档同仓，�
 | `GET /music/api/library` | 曲库：账号歌单分组 + 最近播放 + 每日推荐（未登录 401 `NO_ACCOUNT`） |
 | `GET /music/api/taste?range=` | 画像数据 |
 | `GET /music/api/report?week=` | 周报数据 |
+| `GET /music/api/settings` | 读取设置（模型/音质/上报/外观/写歌单状态/数据目录） |
+| `POST /music/api/settings` | 保存设置（校验不合法项，返回 issues） |
+| `POST /music/api/settings/model-test` | 用选定 provider/model 发一句测试，回 ok/文本/错误 |
 | `GET /music/api/lyric?id=&mode=` | 原词 + 二创（流式见 6.4） |
 | `POST /music/api/scene` | 生成草稿 |
 | `POST /music/api/scene/save` | 落库（写接口未验证时返回 501） |
 | `POST /music/api/queue/*` | 队列动作（沿用） |
 | `POST /music/api/player` | 音量/静音/音质档（写 `session.player`，页面底栏与详情页共用） |
 
-页面路由：`/music/panel`（面板 slot 整页）、`/music/library`、`/music/taste`、`/music/weekly`、`/music/scene`、`/music/lyric`（后五个各自独立 HTML，面板只提供入口链接）。
+页面路由：`/music/panel`（面板 slot 整页）、`/music/library`、`/music/taste`、`/music/weekly`、`/music/scene`、`/music/lyric`、`/music/settings`（后六个各自独立 HTML，面板只提供入口链接）。
 
 ### 6.3 配置面（`cordis.patch.yml`，保留原样，只改注释语言）
 

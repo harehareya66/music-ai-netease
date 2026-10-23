@@ -311,3 +311,23 @@ type0 only          => code 200, all 100 首, week 0
 
 ### 实施排期（用户已批，13 人天）
 P0 定案 ✅ → P1 设置与模型底座 2d → P2 二创 v2 2d → P3 AI DJ v2 2d / P4 周报修正 1d（可并行）→ P5 歌词与悬浮窗 2d → P6 安全页与静态检查 1.5d → P7 主题模板 1d → P8 回归发布 1d。
+
+## 19. P1 设置与模型底座（2026-10-23）
+
+### 做了什么
+- **新建 `lib/settings.js`**：`normalizeSettingsPatch()`（模型成对、音质 6 档、scrobble 三态、dj.batchSize 1-20、autoExtendBelow 0-50、ui.template auto/dark/light、fontScale 0.85-1.3；未知键记 issues）、`preferredModel()`（settings → 会话默认模型 → null）、`modelCatalog()`、`effectiveModel()`（再回落 `resolveRoute`）、`testModel()`（发「只回两个字：可以」）。
+- **`lib/session.js`**：settings 增 `model:{provider:'',model:''}`（空 = 跟随会话）与 `ui:{template:'auto',fontScale:1}`；旧的 `djProvider/djModel` 保留为镜像，写 model 时同步。
+- **一条模型路由**：`lib/index.js` 里 AiDj 的 model、`lib/features.js` 的 `remix()` 都改走 `preferredModel()`，不再一个读 `dj.*`、一个读 `config.remix.*`；`config.remix` 只作最后回落。
+- **路由**：`GET/POST /music/api/settings`、`POST /music/api/settings/model-test`、页面 `/music/settings`（`PAGE_NAMES` 加 `settings`）；`#settingsView()` 返回 settings/agentDefault/catalog/catalogError/effective/write/dataDir。
+- **页面 `lib/ui/settings.html`**：四块——模型（跟随 DSH / 固定某模型 + provider/model 联动 select + 测试按钮）、播放（音质 6 档、播放上报 跟随/开/关）、外观（模板 + 字号 85%-130%，P7 接令牌）、数据与安全（dataDir、写歌单、账号、入口链接）；保存走 POST，issues 逐条提示。面板 feature-nav 加「设置」。
+- **测试**：`test/settings.test.mjs` 4 例 + `test/plugin.test.mjs` 设置用例（页面 200、GET 初始形状、POST 持久化与 effective.source、非法 model 400、无 llm 时 model-test ok:false），共 **59/59**；`node scripts/check-panel.mjs` 通过。
+- **preview 实测**：POST `/api/settings` → 200，`effective.source:'settings'`；`/api/settings/model-test` → 200 返回文本；截图 `%TEMP%\settings-page.png`、`settings-1100.png`。
+- 视觉两点：单选按钮改自绘（空心 / 红圈红点），字号 range 用 `accent-color` 跟随主题红；右上角只显示「已保存」。
+
+### 为什么这么做
+P0 定案里「模型两套配置」是二创报「没有可用的模型」的根因；把选择收口到一处后，DJ 与二创共享同一条路由，页面上也能直接看到「现在实际用哪个模型」。
+
+### 踩坑
+- 测试 helper `plugin.call(url, method, body)` 是位置参数，先误传对象导致 404；已改。
+- 带 SSE 的页面不能加 `--virtual-time-budget` 截图（永远不结束），统一用 CDP 脚本截。
+- preview 旧进程会残留占端口，重启前先确认端口释放。

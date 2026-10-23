@@ -152,6 +152,50 @@ test('serves the maker console and its facts', async () => {
   }
 });
 
+test('settings page and API agree, and a saved route survives a re-read', async () => {
+  const plugin = mount();
+  try {
+    const page = await plugin.call('/music/settings');
+    assert.equal(page.status, 200);
+    assert.match(page.body, /设置/);
+
+    const initial = await plugin.call('/music/api/settings');
+    assert.equal(initial.status, 200);
+    assert.equal(initial.json.ok, true);
+    // No LLM service is mounted in this fake host, and that is a state the page
+    // has to render, not an error.
+    assert.deepEqual(initial.json.catalog, []);
+    assert.equal(initial.json.settings.model.provider, '');
+    assert.equal(initial.json.write.playlist, true);
+
+    const saved = await plugin.call('/music/api/settings', 'POST', {
+      model: { provider: 'deepseek-account', model: 'deepseek-flash' },
+      level: 'hires',
+      ui: { template: 'dark', fontScale: 1.1 },
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.json.settings.model.model, 'deepseek-flash');
+    assert.equal(saved.json.effective.source, 'settings');
+    assert.equal(saved.json.settings.level, 'hires');
+    assert.equal(saved.json.settings.ui.fontScale, 1.1);
+
+    const reread = await plugin.call('/music/api/settings');
+    assert.equal(reread.json.settings.model.provider, 'deepseek-account');
+
+    const bad = await plugin.call('/music/api/settings', 'POST', { model: { provider: 'only-provider' } });
+    assert.equal(bad.status, 400);
+    assert.match(bad.json.error, /provider 和 model/);
+
+    const noModel = await plugin.call('/music/api/settings/model-test', 'POST', { provider: 'p', model: 'm' });
+    // Without a host LLM service the test reports a coded failure instead of
+    // pretending the route works.
+    assert.equal(noModel.status, 200);
+    assert.equal(noModel.json.ok, false);
+  } finally {
+    plugin.dispose();
+  }
+});
+
 test('taste endpoint answers with an empty profile before any play', async () => {
   const plugin = mount();
   try {
