@@ -206,3 +206,15 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 - 实测（CDP 采样每 400ms 读 `#remixBody.textContent.length`）：`[18,18,18,18,18,30,30,40,49,49,59,59,64,64]`，结束时 badge「DSH 模型生成 · 4.9s」、无报错；首个 delta 前约 2s 是服务端拉歌词 + 建 prompt 的固定开销。
 - 新增 `test/model.test.mjs` 4 例（delta 转发、streamText 路由与 trim、无路由返回 null、失败时已转发 delta 不丢），测试 **52/52**。
 - 踩坑：往 HTML 内联 JS 里插 `\n` 被写成真实换行导致整页 `SyntaxError: Invalid or unexpected token`；此后一律用 `String.fromCharCode(10)` 或 `--check` 前先抽脚本验证。
+
+## 12. 歌词多选 + 三种改写补齐（2026-10-23）
+
+用户反馈「行数可以多选，而且改写貌似大多数功能只是占位」。核查结果：确实有两处是占位/坏的：
+
+- **多选**：原来 `state.selection` 是 `{from,to}` 单区间，只能单选或拖一段。改成行号数组：单击选中、再点取消、**Shift 连选**（从锚点连到这里，且不清空已点选的行）、**Ctrl/⌘ 加选**、拖动连选；`#selectedNote` 显示「已选 N 行」。
+- **服务端多选**：`lib/core/lyric.js#splitForRemix` 新增 `indexes` 参数（去重、排序、越界丢弃），`lib/features.js` 的 `lyric/remix` 透传，`lib/router.js` 两个 remix 端点接收 `indexes`；返回里带 `sourceIndexes`。
+- **翻译是坏的**：`validateRemix` 原来一律要求中文，翻译出的英文会被判 `not-chinese` 打回。加 `requireChinese` 选项，`features.remix` 只在非翻译模式要求中文。
+- **藏头是写死的**：prompt 里硬编码「夜航西飞」。现在页面多一个「藏头的话」输入框（选藏头时出现），`buildRemixPrompt(mode, text, style, { head })` 用用户输入，没填直接报 `BAD_ARGS` 并提示先填。
+- 短文案（短视频文案）本来就能用；「只改副歌」那颗禁用按钮删掉了，改用「选中的行（可多选）」手动框副歌。
+- 测试：新增 2 例（多选 indexes 去重排序越界、翻译允许非中文），**54/54**。
+- CDP 实测：点第 2 行 → Ctrl 点第 5 行 → Shift 点第 8 行 → 「已选 5 行」`[2,5,6,7,8]` → 改写成功；翻译成功无报错；藏头出现输入框、填「秋日私语」后流式生成成功。
