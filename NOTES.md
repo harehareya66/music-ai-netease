@@ -272,3 +272,15 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 - **A1 音质档**：`POST /music/api/quality {level:'exhigh'}` → `served:'exhigh', br:320000, type:'mp3', downgraded:true`；再切回 `hires` 恢复正常。
 - **A2 切会话不断音（机制层）**：无任何页面打开时，`/api/state.reported` 的 position 在 6 秒内前进 6499ms（引擎在壳里，不依赖页面）。
 - 队列 A3：`insert` 200（下一首插入成功）、`remove` 200，均在真机接口上验证。
+
+## 17. GitHub 同步方式（本机 git push 不可用）
+
+这台机器 `github.com:443` 不通（`api.github.com` 通），所以 `git push` 全部失败；另外卡巴斯基做了 TLS 中间人，Node 的 `fetch` 默认校验失败（`UNABLE_TO_VERIFY_LEAF_SIGNATURE`）。
+
+同步流程（脚本临时写在 `%TEMP%\ncm-upload.mjs`，需要时重建）：
+
+1. `git ls-files` 列出全部受版本控制的文件（`.reference/` 已在 `.gitignore`）；
+2. 逐个 `POST /git/blobs`（base64）→ `POST /git/trees`（全路径条目，无 base_tree）→ `POST /git/commits`（parent = 远端 main）→ `PATCH /git/refs/heads/main`（force）；
+3. 运行时加 `NODE_OPTIONS=--use-system-ca`，让 Node 信任系统证书（卡巴斯基根证书）。
+
+仓库：<https://github.com/harehareya66/music-ai-netease>（main）。最近一次同步 commit `d64edbe`，83 个文件。
