@@ -66,7 +66,13 @@
   .sechd .hint{ margin-left:auto; font-size:11.5px; color:var(--muted); text-align:right; }
 
   /* ---------- 我的歌单 ---------- */
-  .pgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:18px 14px; }
+  .pgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:16px 12px; }
+  .plmore{ display:flex; justify-content:center; margin-top:16px; }
+  .plmore .ghost{
+    padding:8px 18px; border-radius:9px; border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.03); color:var(--muted); font:inherit; font-size:12.5px; cursor:pointer;
+  }
+  .plmore .ghost:hover{ color:var(--text); border-color:rgba(255,255,255,.28); }
   .pcard{
     display:block; width:100%; min-width:0; padding:0; margin:0; border:0; background:transparent;
     color:inherit; font:inherit; text-align:left; cursor:pointer; border-radius:var(--r-sm);
@@ -324,6 +330,9 @@
           <span class="hint" id="plHint">自建与收藏 · 点开查看曲目</span>
         </div>
         <div class="pgrid" id="playlists"></div>
+        <div class="plmore" id="plMore" hidden>
+          <button type="button" id="plMoreBtn" class="ghost">显示全部</button>
+        </div>
         <div class="sec-empty" id="plEmpty" hidden>账号里还没有歌单。去面板搜索并收藏一些歌，这里就会同步。</div>
       </section>
 
@@ -392,7 +401,8 @@
     selected: null,
     tracks: [],
     detailSeq: 0,
-    playSeq: 0
+    playSeq: 0,
+    showAllPlaylists: false
   };
 
   function $(sel, root){ return (root || document).querySelector(sel); }
@@ -548,6 +558,7 @@
 
   /* ---------- 渲染：账号 / 歌单 ---------- */
   function render(d){
+    state.data = d;
     setAccount(d.account);
     renderPlaylists(d);
     renderRecent(d.recent);
@@ -578,19 +589,31 @@
     return card;
   }
 
+  var PLAYLIST_PREVIEW = 18;
+
   function renderPlaylists(d){
     var box = $('#playlists');
-    box.textContent = '';
     var created = Array.isArray(d.created) ? d.created : [];
     var collected = Array.isArray(d.collected) ? d.collected : [];
     var liked = d.liked && d.liked.id ? d.liked : null;
-    var total = created.length + collected.length + (liked ? 1 : 0);
+    var items = [];
+    if (liked) items.push({ playlist: liked, kind: 'liked' });
+    created.forEach(function(item){ if (item && item.id) items.push({ playlist: item, kind: 'created' }); });
+    collected.forEach(function(item){ if (item && item.id) items.push({ playlist: item, kind: 'collected' }); });
+    var total = items.length;
 
-    if (liked) box.appendChild(playlistCard(liked, 'liked'));
-    created.forEach(function(item){ if (item && item.id) box.appendChild(playlistCard(item, 'created')); });
-    collected.forEach(function(item){ if (item && item.id) box.appendChild(playlistCard(item, 'collected')); });
+    // 108 张卡铺满三屏，找歌单反而更慢：默认只放两行，要看全部再展开。
+    var shown = state.showAllPlaylists ? items : items.slice(0, PLAYLIST_PREVIEW);
+    box.textContent = '';
+    shown.forEach(function(entry){ box.appendChild(playlistCard(entry.playlist, entry.kind)); });
 
     $('#plEmpty').hidden = total > 0;
+    $('#plMore').hidden = total <= PLAYLIST_PREVIEW;
+    if (!$('#plMore').hidden) {
+      $('#plMoreBtn').textContent = state.showAllPlaylists
+        ? '收起（只看前 ' + PLAYLIST_PREVIEW + ' 张）'
+        : '显示全部 ' + total + ' 张';
+    }
     $('#plHint').textContent = total > 0
       ? '自建 ' + created.length + ' 张 · 收藏 ' + collected.length + ' 张 · 点开查看曲目'
       : '自建与收藏 · 点开查看曲目';
@@ -821,6 +844,8 @@
       });
       if (seq !== state.playSeq) return;
       var current = tracks[index] || {};
+      // 不再跳页：底部的浮空岛（lib/ui/mini.js）会显示正在播放什么，并接管
+      // 播放/暂停/音量；桌面壳里音频归壳，离开本页也不会断。
       toast('正在播放：' + (current.name || label || ''));
     } catch (err) {
       toast((err && err.message) ? err.message : '播放失败，请重试', 'err');
@@ -906,6 +931,10 @@
 
   /* ---------- 绑定 ---------- */
   $('#retry').addEventListener('click', function(){ load(); });
+  $('#plMoreBtn').addEventListener('click', function(){
+    state.showAllPlaylists = !state.showAllPlaylists;
+    if (state.data) renderPlaylists(state.data);
+  });
   $('#dClose').addEventListener('click', closeDetail);
   $('#dPlayAll').addEventListener('click', function(){
     if (!state.tracks.length) return;
@@ -920,5 +949,6 @@
   load();
 })();
 </script>
+<script src="__BASE__/mini.js" defer></script>
 </body>
 </html>

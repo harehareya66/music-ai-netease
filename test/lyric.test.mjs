@@ -73,3 +73,20 @@ test('credit rows are recognised and dropped, timings stay usable', () => {
   // The original object is untouched: the page may still want the full payload.
   assert.equal(parsed.lines.length, 4);
 });
+
+test('splitForRemix takes an arbitrary set of line indexes (multi-select)', () => {
+  const { lines } = parseLrc('[00:01.00]一\n[00:02.00]二\n[00:03.00]三\n[00:04.00]四\n');
+  const parsed = { lines, wordLevel: false, format: 'lrc' };
+  const picked = splitForRemix(parsed, { range: 'selection', indexes: [3, 0, 3, 99] });
+  assert.equal(picked.text, '一\n四');
+  assert.deepEqual(picked.indexes, [0, 3]);
+  assert.equal(picked.count, 2);
+  // 没有 indexes 时仍然走时间区间，兼容旧调用
+  const ranged = splitForRemix(parsed, { range: 'selection', from: 0, to: 0 });
+  assert.equal(ranged.text, '一');
+});
+
+test('validateRemix can accept non-Chinese output for translation mode', () => {
+  assert.equal(validateRemix('The wind comes from the west').issues.includes('not-chinese'), true);
+  assert.equal(validateRemix('The wind comes from the west', { requireChinese: false }).ok, true);
+});

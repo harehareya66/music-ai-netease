@@ -304,10 +304,10 @@
             <input id="name" type="text" maxlength="40" autocomplete="off" placeholder="给这张歌单起个名字">
           </div>
           <div class="saveact">
-            <button class="primary" type="button" id="saveLocal">只存本地</button>
-            <button class="second" type="button" id="saveAccount" disabled title="写歌单接口待验证（M0 V2/V3）">存到我的歌单</button>
+            <button class="primary" type="button" id="saveAccount">存到我的网易云歌单</button>
+            <button class="second" type="button" id="saveLocal">只存本地</button>
           </div>
-          <div class="locked"><span class="lockicon">⌁</span>写歌单接口待验证（M0 V2/V3），现在只能只存本地。</div>
+          <div class="locked"><span class="lockicon">⌁</span>会写进你的网易云账号「我的歌单」，随时可删；没登录或写入失败时不会静默改成本地。</div>
           <div class="saveTip" id="saveTip"></div>
         </section>
       </aside>
@@ -417,8 +417,8 @@
     state.op = on;
     var ids = ['#swap', '#reorder', '#previewAll', '#saveLocal'];
     ids.forEach(function(id){ var b = $(id); if (b) b.disabled = on; });
-    /* D8：写歌单接口验证通过前，账号保存按钮始终置灰 */
-    $('#saveAccount').disabled = true;
+    /* 写歌单接口已在 M0 验证（V2/V3），按钮随草稿状态启用 */
+    $('#saveAccount').disabled = on || state.items.length === 0;
     $('#generate').disabled = on || state.generating;
     var rms = document.querySelectorAll('.rm');
     for (var i = 0; i < rms.length; i++) rms[i].disabled = on;
@@ -690,6 +690,7 @@
         body: JSON.stringify({ trackIds: ids })
       });
       var count = data && data.count !== undefined ? data.count : ids.length;
+      // 不跳页：底部浮空岛显示正在播放，并接管播放/暂停/音量。
       toast('已加入临时队列，共 ' + fmt(num(count)) + ' 首');
     } catch (err) {
       showError(err && err.message ? err.message : '试听失败，请重试');
@@ -721,8 +722,10 @@
     } catch (err) {
       if (mode === 'account' && (err.status === 501 || err.code === 'UNVERIFIED')) {
         tip.className = 'saveTip warn';
-        tip.textContent = '写歌单还没验证，已只存本地。';
+        tip.textContent = '写歌单开关被关掉了，已只存本地。';
         await saveLocalAfterUnverified(name);
+      } else if (mode === 'account' && (err.status === 401 || err.code === 'NOT_SIGNED_IN' || err.code === 'NO_ACCOUNT')) {
+        showError('还没登录网易云：先去播放器页扫码，再回来存到账号');
       } else {
         showError(err && err.message ? err.message : '保存失败，请重试');
       }
@@ -750,6 +753,7 @@
     tip.textContent = mode === 'local'
       ? ('已只存本地《' + (data.name || $('#name').value) + '》· ' + count + ' 首')
       : ('已存到你的网易云歌单《' + (data.name || $('#name').value) + '》· ' + count + ' 首');
+    if (tip.scrollIntoView) tip.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     toast(mode === 'local' ? '已只存本地' : '已存到你的歌单');
   }
 
@@ -824,5 +828,6 @@
   })();
 })();
 </script>
+<script src="__BASE__/mini.js" defer></script>
 </body>
 </html>

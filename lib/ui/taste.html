@@ -606,15 +606,20 @@
   function renderStats(p){
     var m = p.metrics || {};
     var d = p.deltas || null;
+    var counted = Boolean(p.dataSource && p.dataSource.account && !p.dataSource.local);
 
-    $('#statNew').textContent = pct(m.newRate) + '%';
-    $('#statRepeat').textContent = pct(m.repeatRate) + '%';
+    // 账号记录没有时间轴：新歌率算不出来就写「—」，不拿 0 充数。
+    $('#statNew').textContent = (m.newRate === null || m.newRate === undefined) ? '—' : pct(m.newRate) + '%';
+    $('#statRepeat').textContent = (m.repeatRate === null || m.repeatRate === undefined) ? '—' : pct(m.repeatRate) + '%';
     $('#statBpm').textContent = (m.avgBpm === null || m.avgBpm === undefined) ? '—' : String(Math.round(num(m.avgBpm)));
 
     if (!d) {
-      deltaText($('#statNewDelta'), null, '%');
-      deltaText($('#statRepeatDelta'), null, '%');
-      deltaText($('#statBpmDelta'), null, '');
+      var why = counted ? '账号记录只有累计值，没有上一周期' : '暂无上一周期数据';
+      ['#statNewDelta', '#statRepeatDelta', '#statBpmDelta'].forEach(function (sel) {
+        var node = $(sel);
+        node.textContent = why;
+        node.className = 'up';
+      });
       return;
     }
     if (tooThin(p, 'newRate')) thinLabel($('#statNewDelta'));
@@ -668,5 +673,6 @@
   load(state.range, {});
 })();
 </script>
+<script src="__BASE__/mini.js" defer></script>
 </body>
 </html>

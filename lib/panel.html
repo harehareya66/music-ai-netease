@@ -70,6 +70,10 @@
       input, select {
         background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
       }
+      /* Chromium's native dropdown paints its own white popup, while the option
+         text inherits the page's near-white colour — the list looked empty. Pin
+         both so 音质/模型 下拉列表 在深色面板里看得见。 */
+      select option, select optgroup { background: #1c1d21; color: #f9fafb; }
       input:focus, select:focus, button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; }
       /* One icon set, one stroke: every icon on the page is drawn the same way,
          and a state fills the outline rather than swapping in another glyph. */
@@ -109,6 +113,12 @@
         border-radius: 8px; line-height: 1; white-space: nowrap;
       }
       .feature-nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+      /* Maker-mode console: present but quiet — it is for the developer, not the listener. */
+      .feature-nav a.dev-link {
+        color: var(--muted); opacity: .72; border: 1px dashed rgba(255, 255, 255, 0.16);
+        border-radius: 7px; padding: 4px 9px; margin-left: 6px;
+      }
+      .feature-nav a.dev-link:hover { opacity: 1; border-color: rgba(255, 255, 255, 0.34); }
       @media (max-width: 720px) { .feature-nav { display: none; } }
       .library-cta {
         display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
@@ -155,25 +165,25 @@
       .link:hover:not(:disabled) { background: none; color: var(--fg); }
 
       /* ------------------------------------------------------------- stage */
-      .np { display: flex; gap: 18px; align-items: flex-end; }
+      .np { display: flex; gap: 26px; align-items: flex-end; }
       /* The frame holds the place, with a note in it, while there is no cover. */
       .cover {
-        position: relative; width: clamp(96px, 22vw, 180px); aspect-ratio: 1; flex: none;
-        border-radius: var(--radius); overflow: hidden; background: var(--panel);
+        position: relative; width: clamp(112px, 24vw, 264px); aspect-ratio: 1; flex: none;
+        border-radius: 16px; overflow: hidden; background: var(--panel);
         display: grid; place-items: center; color: var(--faint); font-size: 40px;
-        box-shadow: 0 6px 24px color-mix(in srgb, #000 14%, transparent);
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.46);
       }
       #cover-icon { display: grid; place-items: center; width: 38%; height: 38%; }
       #cover-icon svg.i { width: 100%; height: 100%; stroke-width: 1.5; }
       #cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .np-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-      .now-title { font-size: 22px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-      .now-artists { font-size: 14px; }
-      .now-album { color: var(--muted); }
+      .now-title { font-size: 27px; font-weight: 700; line-height: 1.24; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+      .now-artists { font-size: 14.5px; }
+      .now-album { color: var(--muted); font-size: 12.5px; }
       /* What to do about this track: the taste switchers and the boosts. A
          state is an accent icon on a tint, never a solid block — the only
          filled control on the stage is play. */
-      .taste { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+      .taste { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
       .taste button {
         width: 34px; height: 34px; padding: 0; border-radius: 50%; display: grid; place-items: center;
         background: none; color: var(--muted);
@@ -181,21 +191,22 @@
       .taste button:hover:not(:disabled) { color: var(--fg); background: var(--hover); }
       .taste button.on { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
 
-      .progress { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .progress { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
       input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; border: 0; padding: 0; height: 16px; flex: 1; min-width: 0; }
-      input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 16%, transparent); }
-      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: var(--accent); }
+      input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 14%, transparent); }
+      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; margin-top: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.14); }
       input[type="range"]:focus { outline: none; }
 
-      .transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
+      .transport { display: flex; align-items: center; justify-content: center; gap: 20px; }
       .transport button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: none; border-color: transparent; }
       .transport button:hover:not(:disabled) { background: var(--hover); }
-      .transport #play { width: 52px; height: 52px; background: var(--accent); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+      .transport #play { width: 58px; height: 58px; background: var(--accent); color: #fff; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 42%, transparent); }
       .transport #play:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
       .transport svg.i { width: 20px; height: 20px; }
-      .transport #play svg.i { width: 22px; height: 22px; }
+      .transport #play svg.i { width: 24px; height: 24px; }
 
-      .secondary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+      .secondary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px;
+        border-top: 1px solid var(--line); padding-top: 10px; }
       .secondary select, .secondary > button { padding: 4px 8px; font-size: 12px; }
       #quality-info { color: var(--muted); }
       .volume-control { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -211,7 +222,7 @@
       }
       .tab:hover:not(:disabled) { background: none; color: var(--fg); }
       .tab.on { color: var(--fg); border-bottom-color: var(--accent); }
-      .lyrics[hidden], .details[hidden] { display: none; }
+      .lyrics[hidden], .details[hidden], .profile[hidden] { display: none; }
       /* The pane is a glance at the current line, not a page: a few lines of
          synced text, scrolled for the rest. `--lyrics-lines` is the single knob. */
       .lyrics {
@@ -222,6 +233,21 @@
       .lyrics::-webkit-scrollbar { display: none; }
       .lyrics p { margin: 0; padding: 2px 0; color: var(--faint); transition: color 0.15s; }
       .lyrics p.on { color: var(--fg); font-weight: 600; }
+
+      /* 画像摘要：面板里只放一句话 + 标签 + 三个数，完整画像在独立页。 */
+      .profile { max-height: 320px; overflow: auto; padding: 8px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+      .profile .profile-summary { font-size: 15.5px; line-height: 1.85; }
+      .profile .profile-summary b { color: var(--accent); font-weight: 600; }
+      .profile .profile-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+      .profile .ptag { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      .profile .ptag:first-child { border-color: rgba(229,72,77,.45); color: #ffb4b6; }
+      .profile .profile-metrics { display: flex; gap: 10px; color: var(--muted); font-size: 12px; }
+      .profile .profile-metrics span { border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; background: rgba(255, 255, 255, 0.02); }
+      .profile .profile-metrics b { color: var(--fg); font-size: 18px; font-weight: 650; margin-right: 4px; font-variant-numeric: tabular-nums; }
+      .profile .profile-more { color: var(--accent); font-size: 12.5px; text-decoration: none; align-self: flex-start;
+        border: 1px solid rgba(229, 72, 77, 0.4); border-radius: 999px; padding: 5px 14px; }
+      .profile .profile-more:hover { background: var(--accent-soft); text-decoration: none; }
+      .profile .profile-more:hover { text-decoration: underline; }
 
       /* The song's facts first, then prose about the song, its artists and its
          album, each clamped to a few lines until clicked. */
@@ -275,11 +301,21 @@
       }
 
       /* -------------------------------------------------------------- side */
-      .dj-card { padding-bottom: 12px; flex: none; }
+      .dj-card { padding-bottom: 12px; flex: none;
+        border-color: rgba(229, 72, 77, 0.34);
+        box-shadow: 0 0 0 1px rgba(229, 72, 77, 0.08), 0 10px 30px rgba(0, 0, 0, 0.24); }
       .dj-card .card-head { padding-bottom: 8px; }
       .dj-card .card-head .title { color: var(--fg); font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: 0; }
       .dj-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px; font-size: 12px; }
-      #dj-prompt { width: 100%; }
+      .dj-start-row { display: flex; gap: 8px; align-items: center; }
+      #dj-prompt { flex: 1; min-width: 0; }
+      #dj-start {
+        flex: none; border: 0; border-radius: 8px; padding: 8px 14px;
+        background: var(--red); color: #fff; font: inherit; font-weight: 600;
+        cursor: pointer; white-space: nowrap;
+      }
+      #dj-start:hover { filter: brightness(1.08); }
+      #dj-start:disabled { opacity: .55; cursor: default; }
       /* A switch reads on or off at a glance: the DJ, the listening history. */
       .switch {
         position: relative; width: 38px; height: 22px; padding: 0; border-radius: 11px;
@@ -327,13 +363,13 @@
 
       .queue-card { display: flex; flex-direction: column; overflow: hidden; }
       #queue { padding: 0 6px 6px; }
-      .row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; cursor: pointer; }
+      .row { display: flex; align-items: center; gap: 11px; padding: 7px 8px; border-radius: 10px; cursor: pointer; }
       .row:hover { background: var(--hover); }
-      .row.playing { background: var(--accent-soft); }
+      .row.playing { background: linear-gradient(90deg, var(--accent-soft), transparent 84%); }
       .row.playing .name { color: var(--accent); font-weight: 600; }
       .row .idx { width: 20px; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; }
       .row.playing .idx { color: var(--accent); display: grid; justify-items: end; }
-      .row img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex: none; background: var(--panel); }
+      .row img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex: none; background: var(--panel); }
       .row .meta { min-width: 0; flex: 1; }
       .row .name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .row .sub { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -341,7 +377,7 @@
       .row .dur { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; font-size: 12px; min-width: 32px; text-align: right; }
       .row .acts { display: none; gap: 4px; flex: none; }
       .row .acts button { padding: 3px 5px; background: none; color: var(--muted); }
-      .row .acts button:hover:not(:disabled) { color: var(--fg); }
+      .row .acts button:hover:not(:disabled) { color: var(--accent); }
       .row:hover .acts { display: flex; }
       /* The list's own like control. A liked track keeps its filled heart
          visible; the hollow one only appears on hover, so an unrated list is
@@ -383,6 +419,7 @@
           <a href="__BASE__/weekly">周报</a>
           <a href="__BASE__/scene">场景</a>
           <a href="__BASE__/lyric">歌词二创</a>
+          <a href="__BASE__/dev" class="dev-link" title="制作者检查台：环境、探针结论、功能自检">检查台</a>
         </nav>
         <div class="history" id="history" hidden>
           <span id="history-label" data-i18n="scrobbleLabel">Listening history</span>
@@ -440,10 +477,12 @@
               <div class="tabs" role="tablist">
                 <button id="tab-details" class="tab" type="button" role="tab" data-i18n="details">Details</button>
                 <button id="tab-lyrics" class="tab" type="button" role="tab" data-i18n="lyrics">Lyrics</button>
+                <button id="tab-profile" class="tab" type="button" role="tab" data-i18n="profile">Profile</button>
               </div>
             </div>
             <div class="details" id="details" role="tabpanel"><p class="hint">—</p></div>
             <div class="lyrics" id="lyrics" role="tabpanel" hidden><p class="hint">—</p></div>
+            <div class="profile" id="profile" role="tabpanel" hidden><p class="hint">—</p></div>
           </div>
         </section>
 
@@ -455,7 +494,10 @@
               <button id="dj-toggle" class="switch" role="switch" data-i18n-title="djToggleTitle" title="Continuous AI DJ: keep the queue stocked">AI DJ</button>
             </div>
             <div class="dj-body">
-              <input id="dj-prompt" data-i18n-ph="djPromptPh" placeholder="AI DJ mood, e.g. rainy afternoon jazz" />
+              <div class="dj-start-row">
+                <input id="dj-prompt" data-i18n-ph="djPromptPh" placeholder="AI DJ mood, e.g. rainy afternoon jazz" />
+                <button id="dj-start" class="primary" type="button" title="按这句话生成一批歌并持续补队列">开始 DJ</button>
+              </div>
               <div id="dj-status"></div>
               <div id="boosts"></div>
               <div class="model" id="dj-model">
@@ -551,6 +593,13 @@
           mute: '静音',
           lyrics: '歌词',
           details: '详情',
+          profile: '画像',
+          profileFull: '看完整画像',
+          profileLoading: '正在读你的口味…',
+          profileEmpty: '还没有足够的播放记录，听几首再来看',
+          profileFailed: '画像没读出来，点这里重试',
+          profileHours: '小时',
+          profileTracks: '首',
           noDetails: '暂无这首歌的信息',
           album: '专辑',
           albumTracks: '{n} 首',
@@ -597,8 +646,9 @@
           gesturePlay: '点击播放',
           gestureNote: '在窗口任意处点击也可以',
           queueEmpty: '队列为空，用 AI DJ 或让助手补歌',
-          remove: '移除',
-          removed: '已移除',
+          remove: '移出队列',
+          removed: '已移出队列',
+          removeHint: '移出队列（没评过级的歌会顺手记一次不喜欢）',
           clearQueue: '清空',
           clearQueueTitle: '清空队列，保留正在播放的歌曲；不会给歌曲打分',
           loading: '加载中…',
@@ -669,6 +719,13 @@
           mute: 'Mute',
           lyrics: 'Lyrics',
           details: 'Details',
+          profile: 'Profile',
+          profileFull: 'Full profile',
+          profileLoading: 'Reading your taste…',
+          profileEmpty: 'Not enough plays yet — listen to a few songs',
+          profileFailed: 'Could not load the profile; click to retry',
+          profileHours: 'h',
+          profileTracks: 'tracks',
           noDetails: 'No details for this song',
           album: 'Album',
           albumTracks: '{n} tracks',
@@ -715,8 +772,9 @@
           gesturePlay: 'Play',
           gestureNote: 'clicking anywhere works too',
           queueEmpty: 'Queue empty — use the AI DJ or ask the assistant to add songs',
-          remove: 'Remove',
-          removed: 'Removed',
+          remove: 'Remove from queue',
+          removed: 'Removed from queue',
+          removeHint: 'Remove from queue (also records a dislike if unrated)',
           clearQueue: 'Clear',
           clearQueueTitle: 'Clear the queue, keeping the song playing; no song is rated',
           loading: 'Loading…',
@@ -1045,7 +1103,13 @@
        */
       function failureText(error) {
         if (error.code === 'ANONYMOUS') return t('likeNeedsSignIn');
-        return error.message;
+        // 服务端有几处英文错误直出（not found / method not allowed 等），
+        // 面板是中文单语产品，这里统一收口成能读的一句话。
+        const message = String(error.message || '');
+        if (/not found/i.test(message)) return '没找到这首歌，可能已下架或需要换一首';
+        if (/method not allowed/i.test(message)) return '这个操作服务端不支持';
+        if (/unauthor/i.test(message)) return '登录状态失效了，去面板重新扫码';
+        return message;
       }
 
       // ------------------------------------------------------------- transport
@@ -1136,6 +1200,28 @@
           },
         });
         playback.audio.addEventListener('timeupdate', () => { paintProgress(); paintLyrics(); });
+
+        /**
+         * 接着上一页的位置放，而不是从 0 开始。
+         *
+         * 浮空岛在离开页面时会把真实位置 sendBeacon 给服务端，所以新页面拿到的
+         * `state.reported` 就是「刚才播到哪」。只在同一首、位置明显靠后、且自己
+         * 还停在开头时才补，避免把正常切歌（reported 属于上一首）也拽回去。
+         */
+        playback.audio.addEventListener('loadedmetadata', () => {
+          const reported = state?.reported;
+          if (!reported || !state?.current) return;
+          if (String(reported.trackId) !== String(state.current.id)) return;
+          const base = Number(reported.position) || 0;
+          if (base < 2000) return;
+          const elapsed = reported.playing && reported.at ? Math.max(0, Date.now() - Number(reported.at)) : 0;
+          const target = base + elapsed;
+          const duration = Number(reported.duration) || playback.audio.duration || 0;
+          if (duration && target >= duration - 1500) return;
+          try {
+            if (Math.abs(playback.audio.currentTime * 1000 - target) > 1500) playback.audio.currentTime = target / 1000;
+          } catch { /* 媒体还不能寻址时，下一次 apply 会带 pendingSeek */ }
+        });
 
         return {
           playback: true,
@@ -1272,14 +1358,19 @@
           if (signin) signin.onclick = openLogin;
         }
 
-        // DJ status
+        // DJ status — Chinese only. The server's plan.vibe is a model/user string
+        // (often English diagnostics), so the heuristic path says it in our words.
         const dj = state.dj || {};
+        const heuristic = dj.lastPlan?.source === 'heuristic';
+        const djReason = heuristic
+          ? '模型没连上，先按相似歌曲、榜单和你的口味兜底'
+          : esc(dj.lastPlan?.vibe || '');
         setHtml($('dj-status'), dj.enabled || dj.lastPlan
-          ? `<div class="plan">${dj.busy ? esc(t('djPlanning')) : dj.error ? `AI DJ: ${esc(dj.error)}` : ''}${
+          ? `<div class="plan">${dj.busy ? esc(t('djPlanning')) : dj.error ? `AI DJ 失败：${esc(dj.error)}` : ''}${
               dj.lastPlan
-                ? `<div><b>+${dj.lastPlan.added}</b> ${esc(dj.lastPlan.vibe || '')}</div><div class="muted">${esc((dj.lastPlan.names || []).slice(-3).join(' · '))}</div>`
+                ? `<div><b>+${dj.lastPlan.added}</b> 首 · ${djReason}</div><div class="muted">${esc((dj.lastPlan.names || []).slice(-3).join(' · '))}</div>`
                 : ''
-            }${dj.modelError && !dj.lastPlan?.route ? `<div class="muted">${esc(t('modelTierUnavailable'))}: ${esc(dj.modelError)}</div>` : ''}${dj.lastPlan?.source === 'heuristic' ? `<div class="muted">${esc(t('heuristics'))}</div>` : ''}</div>`
+            }${heuristic && dj.modelError ? `<div class="muted">想更准：在「AI DJ 模型」里选一个可用模型。</div>` : ''}</div>`
           : '');
 
         if (autoplayBlocked()) {
@@ -1358,7 +1449,7 @@
               ${track.vip ? '<span class="tag">VIP</span>' : ''}
               <button class="heart ${track.liked ? 'on' : ''}" data-like="${index}" title="${esc(t(track.liked ? 'unlike' : 'like'))}">${icon('heart', { filled: track.liked, small: true })}</button>
               <span class="dur">${fmt(track.duration)}</span>
-              <span class="acts"><button data-remove="${index}" title="${esc(t('remove'))}">${icon('x', { small: true })}</button></span>
+              <span class="acts"><button data-remove="${index}" title="${esc(t('removeHint'))}">${icon('x', { small: true })}</button></span>
             </div>`;
           })
           .join(''));
@@ -1593,7 +1684,7 @@
 
       /** Reflect `infoView` in the tabs and the panes. */
       function paintInfoTabs() {
-        for (const view of ['details', 'lyrics']) {
+        for (const view of ['details', 'lyrics', 'profile']) {
           const on = infoView === view;
           $('tab-' + view).classList.toggle('on', on);
           $('tab-' + view).setAttribute('aria-selected', on ? 'true' : 'false');
@@ -1606,6 +1697,10 @@
        * pane is neither fetched nor painted, and catches up when it is shown.
        */
       function syncInfo(trackId) {
+        if (infoView === 'profile') {
+          renderProfile(false);
+          return;
+        }
         if (infoView === 'details') {
           if (trackId === detailsTrackId) return;
           detailsTrackId = trackId;
@@ -1623,6 +1718,54 @@
         }
       }
 
+      // ------------------------------------------------------------- profile
+      /** 面板里的画像只是摘要：一句话 + 标签 + 三个数，完整画像在独立页。 */
+      let profileLoadedAt = 0;
+      let profileBusy = false;
+      async function renderProfile(force) {
+        const pane = $('profile');
+        if (profileBusy) return;
+        if (!force && pane.dataset.ready === '1' && Date.now() - profileLoadedAt < 120000) return;
+        profileBusy = true;
+        pane.innerHTML = `<p class="hint">${esc(t('profileLoading'))}</p>`;
+        try {
+          const data = await api('/taste?range=4w');
+          const profile = data && data.profile ? data.profile : null;
+          const metrics = profile && profile.metrics ? profile.metrics : null;
+          if (!metrics || !metrics.plays) {
+            pane.dataset.ready = '0';
+            pane.innerHTML = `<p class="hint">${esc(t('profileEmpty'))}</p>`;
+            return;
+          }
+          const tags = (profile.tags || []).slice(0, 6);
+          const hours = Number(metrics.hours || 0).toFixed(1);
+          const chips = tags.map((tag) => {
+            const label = tag && typeof tag === 'object' ? tag.label : tag;
+            return `<span class="ptag">${esc(label || '')}</span>`;
+          }).join('');
+          pane.innerHTML = `
+            <p class="profile-summary">${esc(profile.summary || '').replace(/(\d+(?:\.\d+)?%?)/g, '<b>$1</b>')}</p>
+            <div class="profile-tags">${chips}</div>
+            <div class="profile-metrics">
+              <span><b>${esc(hours)}</b>${esc(t('profileHours'))}</span>
+              <span><b>${esc(metrics.tracks || 0)}</b>${esc(t('profileTracks'))}</span>
+              <span><b>${esc(metrics.avgBpm || '—')}</b> BPM</span>
+            </div>
+            <a class="profile-more" href="${esc(BASE)}/taste">${esc(t('profileFull'))} →</a>`;
+          pane.dataset.ready = '1';
+          profileLoadedAt = Date.now();
+        } catch {
+          pane.dataset.ready = '0';
+          pane.innerHTML = `<p class="hint">${esc(t('profileFailed'))}</p>`;
+        } finally {
+          profileBusy = false;
+        }
+      }
+
+      $('profile').onclick = () => {
+        if ($('profile').dataset.ready !== '1') renderProfile(true);
+      };
+
       function showInfo(view) {
         if (view === infoView) return;
         infoView = view;
@@ -1635,10 +1778,12 @@
           lyricLine = -1;
           paintLyrics();
         }
+        if (view === 'profile') renderProfile(false);
       }
 
       $('tab-details').onclick = () => showInfo('details');
       $('tab-lyrics').onclick = () => showInfo('lyrics');
+      $('tab-profile').onclick = () => showInfo('profile');
       paintInfoTabs();
 
       // The introduction's switch, or the written one itself, swaps it with
@@ -1752,7 +1897,7 @@
           setTimeout(afterDetails);
         } catch (error) {
           if (request !== detailsRequest) return;
-          $('details').innerHTML = `<p class="hint">${esc(error.message)}</p>`;
+          $('details').innerHTML = `<p class="hint">${esc(failureText(error))}</p>`;
         }
       }
 
@@ -2290,7 +2435,7 @@
         }
         const kbps = last.br ? ` · ${Math.round(last.br / 1000)} kbps` : '';
         setText($('quality-info'),
-          `▶ ${String(last.type ?? '').toUpperCase()}${kbps}` + (last.downgraded ? ` (${last.served}, ${t('downgraded')})` : ''));
+          `▶ ${String(last.type ?? '').toUpperCase()}${kbps}` + (last.downgraded ? `（${qualityLabel({ id: last.served })}, ${t('downgraded')}）` : ''));
       }
 
       async function loadQuality() {
@@ -2398,6 +2543,49 @@
           toast(failureText(error));
         } finally {
           if (button) button.disabled = false;
+        }
+      };
+
+      /** Poll the state until the DJ's plan lands (or give up), so the button can
+       *  say what actually happened instead of just flipping a switch. */
+      async function waitForDjPlan(before, timeoutMs) {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < timeoutMs) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          try {
+            state = newest(await api('/state'));
+            render();
+          } catch { /* keep waiting; SSE or the next poll may win */ }
+          const planAt = state?.dj?.lastPlanAt ?? 0;
+          if (planAt > before && !state?.dj?.busy) return state.dj.lastPlan ?? null;
+        }
+        return state?.dj?.lastPlan ?? null;
+      }
+
+      $('dj-start').onclick = async () => {
+        const button = $('dj-start');
+        if (button.disabled) return;
+        const before = state?.dj?.lastPlanAt ?? 0;
+        button.disabled = true;
+        button.textContent = '挑歌中…';
+        try {
+          state = newest(await api('/dj', { method: 'POST', body: { enabled: true, prompt: $('dj-prompt').value } }));
+          render();
+          toast('AI DJ 已启动，正在挑歌…');
+          const plan = await waitForDjPlan(before, 25000);
+          if (plan && plan.added > 0) {
+            const names = Array.isArray(plan.names) ? plan.names.slice(0, 2).join('、') : '';
+            toast(`AI DJ 补了 ${plan.added} 首${names ? '：' + names : ''}`);
+          } else if (state?.dj?.modelError) {
+            toast('模型没配成，先用相似/榜单兜底；可在「AI DJ 模型」里选一个');
+          } else {
+            toast('AI DJ 已开启，会随播放持续补歌');
+          }
+        } catch (error) {
+          toast(failureText(error));
+        } finally {
+          button.disabled = false;
+          button.textContent = '开始 DJ';
         }
       };
 
