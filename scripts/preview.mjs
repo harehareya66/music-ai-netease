@@ -41,27 +41,45 @@ const logger = {
 };
 
 /**
- * A stand-in LLM for previewing the streaming remix page: answers with a short
- * poem in chunks, so the page can be checked without a provider key.
+ * A stand-in LLM for previewing the streaming remix page **without pretending
+ * to be a writer**: it answers from the text it was given, so two different
+ * selections visibly produce two different results. The first line says it is
+ * fake; real model quality is only checked against a configured provider.
  */
+function fakeAnswer(request) {
+  const content = request?.messages?.at(-1)?.content;
+  const prompt = Array.isArray(content)
+    ? content.map((block) => (typeof block === 'string' ? block : block?.text ?? '')).join('')
+    : String(content ?? '');
+  const source = prompt.split(/\n{2,}/).pop() ?? '';
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const head = prompt.match(/连起来是"([^"]+)"/)?.[1] ?? '';
+  const strip = (line) => line.replace(/[，。！？、；：""''（）\s]/g, '').slice(0, 12);
+
+  if (head) {
+    const chars = Array.from(head);
+    const filler = ['是', '在', '把', '又', '就'];
+    return [
+      '（预览假模型：按你的藏头首字生成，只验证管道）',
+      ...chars.map((char, index) => `${char}${filler[index % filler.length]}预览里的第 ${index + 1} 行`),
+    ];
+  }
+  const shape = '（预览假模型：下面每行都来自你这次选中的歌词，只验证管道）';
+  if (lines.length === 0) return [shape, '这次没有选中任何歌词。'];
+  return [shape, ...lines.slice(0, 7).map((line, index) => `第 ${index + 1} 句 · ${strip(line)}`)];
+}
+
 function makeFakeLlm() {
-  const poem = [
-    '风从西边来的时候，',
-    '你没有把那句话说完。',
-    '夜航的人不看海，',
-    '只看灯一盏一盏地，',
-    '替你把岸边点亮。',
-    '如果明天还有明天，',
-    '我就把今晚折成一只船。',
-  ];
   return {
     listProviders: () => [{ id: 'preview' }],
     listModels: async () => [{ id: 'preview-model' }],
-    stream: () => (async function* generate() {
-      for (const line of poem) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        yield { type: 'text-delta', text: `${line}
-` };
+    stream: (request) => (async function* generate() {
+      for (const line of fakeAnswer(request)) {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        yield { type: 'text-delta', text: `${line}\n` };
       }
       yield { type: 'finish', reason: { kind: 'stop' } };
     })(),
