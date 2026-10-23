@@ -1159,6 +1159,28 @@
         });
         playback.audio.addEventListener('timeupdate', () => { paintProgress(); paintLyrics(); });
 
+        /**
+         * 接着上一页的位置放，而不是从 0 开始。
+         *
+         * 浮空岛在离开页面时会把真实位置 sendBeacon 给服务端，所以新页面拿到的
+         * `state.reported` 就是「刚才播到哪」。只在同一首、位置明显靠后、且自己
+         * 还停在开头时才补，避免把正常切歌（reported 属于上一首）也拽回去。
+         */
+        playback.audio.addEventListener('loadedmetadata', () => {
+          const reported = state?.reported;
+          if (!reported || !state?.current) return;
+          if (String(reported.trackId) !== String(state.current.id)) return;
+          const base = Number(reported.position) || 0;
+          if (base < 2000) return;
+          const elapsed = reported.playing && reported.at ? Math.max(0, Date.now() - Number(reported.at)) : 0;
+          const target = base + elapsed;
+          const duration = Number(reported.duration) || playback.audio.duration || 0;
+          if (duration && target >= duration - 1500) return;
+          try {
+            if (Math.abs(playback.audio.currentTime * 1000 - target) > 1500) playback.audio.currentTime = target / 1000;
+          } catch { /* 媒体还不能寻址时，下一次 apply 会带 pendingSeek */ }
+        });
+
         return {
           playback: true,
           local: true,

@@ -147,3 +147,14 @@ node scripts/probe.mjs --write                               # 真建一张临�
 - 面板「看不到字」根因：`input, select` 没给 `<option>` 定背景/前景，Chromium 的原生下拉是白底、选项文字继承近白 → 白字白底。`panel.html` 加 `select option, select optgroup { background:#1c1d21; color:#f9fafb; }`；`mini.js` 的音质下拉同样处理。
 - CDP 实测：曲库点「播放全部」→ 仍停在 `/music/library`、岛显示「Let Me Go(共创版)」、`audio.paused=false`、`currentTime=3.4s`；跳 `/music/taste` 后岛仍在播同一首（`currentTime` 连续，不是从 0 重来）；暂停/继续/下一首按钮均改变服务端 `playing`/`index`；播放器页不出现浮空岛（`island on panel: false`）；`select option` 计算样式 `color rgb(232,234,237)` / `background rgb(25,28,34)`。
 - 测试仍 38/38；`npm pack` 后更新工作区根的 tgz。
+
+## 7. 浮空岛二次修（2026-10-23，用户三次反馈）
+
+用户报三件：① 从其它页回播放器音乐「重新加载」、进度被重置；② 浮空岛两个按钮一个显示成「500」、一个空的；③ 进度条拖不动。
+
+- ① 根因：纯 H5 下每个页面各自持有一个 `<audio>`，跨页导航必然销毁重建，新页面从 0 开始。修法不是杀重建（做不到），而是重建后**接着上一位置**：`lib/panel.html` 的本地 transport 在 `loadedmetadata` 里读 `state.reported`，同一 trackId、位置 >2s 且播放器仍在开头时把 `currentTime` 设到 `reported.position + 距上次上报的时长`；装进 DSH 桌面壳后音频归壳里的引擎，切换页面根本不会重建，这条兜底只在 H5/preview 生效。
+- ② `mini.js` 的队列按钮原来把「队列」两个字替换成了数字；`chip` 里的 `<svg>` 没定宽高（默认 300×150 被裁掉）→ 看起来是空按钮。改成 `图标 + 「队列」 + 数字`，并补 `.ncm-island .chip svg{width:15px;height:15px;…}`；窄屏（≤1000px）隐藏数字只留「队列」。
+- ③ 进度条原来只是 `<i>` 宽度，不能被拖。加 `<input class="seek" type="range">` 覆盖在进度线上：悬停出现 11px 红点，拖动时实时改时间文字，松手 `POST /api/control {action:'seek', value: ms}`（服务端 `player.seek` 收的是毫秒）。
+- CDP 实测：曲库播放中把 seek 拖到 50% → 浮空岛显示 `1:04 / 2:04`、`audio.currentTime=63`；随后打开 `/music/panel` → 新页面 `audio.currentTime=82`（接着放，不是 0）。
+- 布局：岛宽 `min(1240px, 100% - 32px)`，`1100/720` 两档收窄；1600 宽下时间/队列/音质/音量/播放器一行排开不挤压；900 宽自动两行。
+- 测试 38/38。
