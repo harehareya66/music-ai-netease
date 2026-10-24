@@ -256,3 +256,28 @@ test('feature tool executes the weekly report end to end', async () => {
     plugin.dispose();
   }
 });
+
+test('security page and report expose the audit without leaking secrets', async () => {
+  const plugin = mount();
+  try {
+    const page = await plugin.call('/music/security');
+    assert.equal(page.status, 200);
+    assert.match(page.body, /安全与权限/);
+
+    const res = await plugin.call('/music/api/security');
+    assert.equal(res.status, 200);
+    assert.equal(res.json.ok, true);
+    const { report } = res.json;
+    assert.equal(report.checks.length, 4);
+    assert.equal(report.checksSummary.total, 4);
+    assert.ok(Array.isArray(report.outbound));
+    assert.ok(report.storage.session.exists);
+    // The report must never carry the cookie value itself, only its length.
+    const serialized = JSON.stringify(report);
+    // Only mention the cookie by name is fine; its value must never appear.
+    assert.equal(/MUSIC_U\s*[=:]\s*[A-Za-z0-9%_-]{20,}/.test(serialized), false);
+    assert.ok(typeof report.account.cookieChars === 'number');
+  } finally {
+    plugin.dispose();
+  }
+});

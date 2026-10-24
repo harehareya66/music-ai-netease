@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>安全与权限</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #171a20; --card2: #1c1f26; --line: #262a33;
+    --text: #e8eaed; --muted: #8b909a; --faint: #5c616b;
+    --red: #e5484d; --red-soft: rgba(229, 72, 77, 0.12); --teal: #2fb3a6;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.6; padding-bottom: 120px;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 22px 26px 0; }
+  header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+  .back { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; }
+  .back:hover { color: var(--text); border-color: var(--faint); }
+  .titles h1 { margin: 0; font-size: 20px; letter-spacing: .01em; }
+  .titles p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .grow { flex: 1; }
+  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--muted); font-size: 11.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .pill.ok { color: var(--teal); border-color: rgba(47, 179, 166, .35); }
+  .pill.bad { color: var(--red); border-color: rgba(229, 72, 77, .4); }
+  button.act { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 11.5px; cursor: pointer; }
+  button.act:hover { color: var(--text); border-color: var(--faint); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .card h2 i { width: 7px; height: 7px; border-radius: 50%; background: var(--red); display: inline-block; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 12.5px; }
+  .kv dt { color: var(--faint); }
+  .kv dd { margin: 0; color: var(--text); word-break: break-all; }
+  .tag { display: inline-flex; padding: 0 8px; border-radius: 999px; font-size: 11px; line-height: 18px; }
+  .tag.on { background: var(--red-soft); color: var(--red); }
+  .tag.off { background: rgba(255,255,255,.05); color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--faint); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 11.5px; }
+  ul.plain { margin: 0; padding-left: 16px; color: var(--muted); }
+  ul.plain li { margin: 2px 0; }
+  ul.plain b { color: var(--text); font-weight: 500; }
+  .checks li { list-style: none; margin: 0; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.04); display: flex; gap: 10px; align-items: flex-start; }
+  .checks { margin: 0; padding: 0; }
+  .checks li:last-child { border-bottom: 0; }
+  .checks .dot { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; flex: none; margin-top: 2px; }
+  .checks .dot.ok { background: rgba(47,179,166,.16); color: var(--teal); }
+  .checks .dot.bad { background: var(--red-soft); color: var(--red); }
+  .checks .label { color: var(--text); }
+  .checks .detail { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .checks .issues { color: var(--red); font-size: 11px; margin: 2px 0 0; padding-left: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid2 .card { margin-bottom: 0; }
+  .footer { color: var(--faint); font-size: 11px; text-align: center; padding: 12px 0 0; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .links a { border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; color: var(--muted); font-size: 11.5px; }
+  .links a:hover { color: var(--text); border-color: var(--faint); }
+  @media (max-width: 1120px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .wrap { padding: 18px 16px 0; }
+  }
+  @media (max-width: 760px) { .kv { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="__BASE__/settings" title="返回设置">‹</a>
+    <div class="titles">
+      <h1>安全与权限</h1>
+      <p>账号、cookie、播放历史和模型请求，都在这页说清；检查项直接读源码，不是文案。</p>
+    </div>
+    <span class="grow"></span>
+    <span class="pill" id="summary">正在检查…</span>
+    <button class="act" type="button" id="refresh">重新检查</button>
+  </header>
+
+  <div class="card">
+    <h2><i></i>账号与本机数据</h2>
+    <div class="kv" id="accountBox"></div>
+    <div class="links">
+      <a href="__BASE__/settings">设置</a>
+      <a href="__BASE__/dev">制作者检查台</a>
+      <a href="__BASE__/panel">回播放器</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><i></i>数据存在哪里</h2>
+    <p class="hint">只有本机文件，没有远端备份；文件权限写出来是为了让你能自己核对。</p>
+    <table>
+      <thead><tr><th>文件</th><th>内容</th><th>出网</th><th>说明</th></tr></thead>
+      <tbody id="filesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><i></i>什么会出网</h2>
+    <p class="hint">请求由插件直接发出；模型只收到歌词文本或候选歌名，账号与 cookie 不参与。</p>
+    <table>
+      <thead><tr><th>目标</th><th>用途</th><th>带走什么</th><th>状态</th></tr></thead>
+      <tbody id="outboundBody"></tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2><i></i>插件能做什么</h2>
+      <ul class="plain" id="permsList"></ul>
+    </div>
+    <div class="card">
+      <h2><i></i>插件不会做什么</h2>
+      <ul class="plain" id="neverList"></ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2><i></i>源码静态检查</h2>
+    <p class="hint">每次打开或点「重新检查」都会重扫 lib/ 下的源码（跳过 vendor），最多缓存 60 秒。</p>
+    <ul class="checks" id="checksList"></ul>
+  </div>
+
+  <div class="footer" id="generated"></div>
+</div>
+<script src="__BASE__/mini.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var BASE = (function () {
+    var path = location.pathname.split('/security')[0] || '';
+    return path.replace(/\/$/, '');
+  })();
+  var API = BASE + '/api';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function render(report) {
+    var session = report.storage.session || {};
+    var account = report.account || {};
+    document.getElementById('accountBox').innerHTML = [
+      '<dt>账号</dt><dd>' + (account.signedIn ? '已登录 · ' + esc(account.nickname || '') : '未登录（游客也能听匿名可播的歌）') + '</dd>',
+      '<dt>cookie</dt><dd>' + (account.signedIn ? esc(account.cookieChars) + ' 字符 · ' + esc(account.cookieStored) : '没有保存 cookie') + '</dd>',
+      '<dt>数据目录</dt><dd class="mono">' + esc(report.dataDir) + '</dd>',
+      '<dt>session 权限</dt><dd>' + (session.exists
+        ? (session.private
+          ? '<span class="tag on">' + (session.windows ? '仅当前用户（Windows 用户目录）' : '0600 仅当前用户') + '</span>'
+          : '<span class="tag off">权限 ' + esc(session.modeText) + '，建议收紧到 0600</span>') + ' · ' + esc((session.size / 1024).toFixed(1)) + ' KB'
+        : '还没有 session.json') + '</dd>',
+      '<dt>模型</dt><dd>' + (report.model && (report.model.provider || report.model.model)
+        ? esc(report.model.provider) + ' / ' + esc(report.model.model) + ' · ' + esc(report.model.note)
+        : '未固定模型 · ' + esc(report.model ? report.model.note : '')) + '</dd>'
+    ].join('');
+
+    document.getElementById('filesBody').innerHTML = (report.storage.files || []).map(function (file) {
+      return '<tr><td class="mono">' + esc(file.name) + '</td><td>' + esc(file.what) + '</td><td>' +
+        (file.outbound ? '<span class="tag on">会</span>' : '<span class="tag off">不会</span>') +
+        '</td><td class="mono">' + esc(file.note) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('outboundBody').innerHTML = (report.outbound || []).map(function (row) {
+      return '<tr><td>' + esc(row.target) + '</td><td>' + esc(row.what) + '</td><td>' + esc(row.carries) +
+        '</td><td>' + (row.sent ? '<span class="tag on">在用</span>' : '<span class="tag off">未启用</span>') + '</td></tr>';
+    }).join('');
+
+    var perms = report.permissions || {};
+    var list = document.getElementById('permsList');
+    list.textContent = '';
+    var read = el('li');
+    read.innerHTML = '<b>只读</b>：' + esc((perms.read || []).join('、'));
+    list.appendChild(read);
+    (perms.write || []).forEach(function (item) {
+      var li = el('li');
+      li.innerHTML = '<b>写</b>：' + esc(item.what) + ' ' +
+        (item.enabled ? '<span class="tag on">开启</span>' : '<span class="tag off">关闭</span>') +
+        '<div class="detail" style="color:var(--faint);font-size:11px">' + esc(item.note || '') + '</div>';
+      list.appendChild(li);
+    });
+    var never = document.getElementById('neverList');
+    never.textContent = '';
+    (perms.never || []).forEach(function (item) {
+      var li = el('li');
+      li.textContent = item;
+      never.appendChild(li);
+    });
+
+    var checks = document.getElementById('checksList');
+    checks.textContent = '';
+    (report.checks || []).forEach(function (check) {
+      var li = document.createElement('li');
+      var dot = el('span', 'dot ' + (check.ok ? 'ok' : 'bad'), check.ok ? '✓' : '!');
+      var body = el('div');
+      body.appendChild(el('div', 'label', check.label));
+      body.appendChild(el('div', 'detail', check.detail));
+      if (!check.ok && check.issues && check.issues.length) {
+        var issues = el('ul', 'issues');
+        check.issues.forEach(function (issue) { issues.appendChild(el('li', '', issue)); });
+        body.appendChild(issues);
+      }
+      li.appendChild(dot);
+      li.appendChild(body);
+      checks.appendChild(li);
+    });
+
+    var sum = report.checksSummary || { total: 0, passed: 0, failed: 0 };
+    var summary = document.getElementById('summary');
+    summary.className = 'pill ' + (sum.failed ? 'bad' : 'ok');
+    summary.textContent = sum.failed
+      ? sum.failed + ' 项需要看'
+      : '检查全过 · ' + sum.passed + '/' + sum.total;
+    document.getElementById('generated').textContent =
+      '报告生成于 ' + new Date(report.generatedAt).toLocaleString('zh-CN') + ' · 只读检查，不改任何设置';
+  }
+
+  function load(force) {
+    document.getElementById('summary').textContent = '正在检查…';
+    fetch(API + '/security' + (force ? '?refresh=1' : ''), { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || !data.report) throw new Error('bad payload');
+        render(data.report);
+      })
+      .catch(function (error) {
+        var summary = document.getElementById('summary');
+        summary.className = 'pill bad';
+        summary.textContent = '检查失败：' + error.message;
+      });
+  }
+
+  document.getElementById('refresh').addEventListener('click', function () { load(true); });
+  load(false);
+})();
+</script>
+</body>
+</html>

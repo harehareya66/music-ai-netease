@@ -296,6 +296,7 @@ music-plugin/                     # 仓库根目录（代码与文档同仓，�
 | `GET /music/api/report?week=` | 周报数据 |
 | `GET /music/api/settings` | 读取设置（模型/音质/上报/外观/写歌单状态/数据目录） |
 | `POST /music/api/settings` | 保存设置（校验不合法项，返回 issues） |
+| `GET /music/api/security` | 安全审计报告（文件/出网/静态检查） |
 | `POST /music/api/settings/model-test` | 用选定 provider/model 发一句测试，回 ok/文本/错误 |
 | `GET /music/api/lyric?id=&mode=` | 原词 + 二创（流式见 6.4） |
 | `POST /music/api/scene` | 生成草稿 |

@@ -404,3 +404,19 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - `test/plugin.test.mjs` 新增 1 例（`/music/lyric-window` 200、含「歌词」、不含写歌单端点）；全量 **79/79**；`check-panel` 通过（新页面内联脚本语法在检查范围内）。
 - Edge（Chromium 152）CDP 实测：面板点「悬浮歌词窗」与浮空岛点「歌词」都会新增一个 `about:blank` 顶层窗口，页面标题「歌词」，当前行随播放推进（`RYBERG…` 制作人员行已被过滤，播放后当前行变 `And I'll be waiting in the shadow of the sun.`，上一行 `原唱：Max Elto` 之后也过滤）；暂停时粉红色高亮停在当前行。截图 `design/shots/mvp/lyric-window-play.png`、`lyric-window-panel.png`。
 - 待真机：DSH 桌面壳（Electron 44）里 Document PiP 是否允许由壳决定，若不支持会自动落到 `window.open` 小窗；这一条留到 P8 装包后确认。
+
+## 25. P6 安全与权限页 + 源码静态检查（2026-10-24）
+
+用户要求「安全页要说清账号安全，并做静态测试」。这一页分两层：**说清数据流向**（不是文案，是读真实状态）+ **每次打开都重新扫源码**。
+
+- 新建 `lib/security.js`：`auditSource({files})` 四条检查——`no-eval`（无 `eval` / `new Function`）、`outbound-hosts`（源码里的 URL 只允许 `music.163.com` / `interface.music.163.com` / `s.music.163.com` / `*.music.126.net` / 本机回环）、`cookie-not-logged`（日志语句不含 cookie / MUSIC_U）、`no-child-process`（不 spawn 进程）；注释行跳过（图标来源链接曾被误报）。`collectSources(libDir)` 跳过 `vendor/` 与 `node_modules/`；最多缓存 60 秒。
+- `buildSecurityReport({dataDir,settings,write,model,session,now})` 产出：`storage{dataDir,session,cache,probe}`、`account{signedIn,nickname,uid,cookieChars}`、`outbound[]`（网易云 API / 音频 CDN / 模型服务，各带「带走什么」）、`permissions{read/write}`、`model{provider,model,source}`、`checks + checksSummary`。
+- `lib/router.js`：`PAGE_NAMES` 加 `security`，`GET /api/security` 用 `this.api.authenticated/account`（不是 store）；页面 `GET /music/security`。
+- `lib/ui/security.html`（约 330 行）：账号与本机数据（cookie 只显示长度、session 权限、数据目录、模型来源）、数据存在哪里（3 个文件 × 是否出网）、什么会出网（3 行 × 带走什么 × 状态）、插件能做什么 / 不会做什么、源码静态检查（4 条 + 重新检查）、链到设置/检查台/播放器；1100 单列。
+- 设置页「数据与安全」卡加「安全与权限 →」入口。
+- 踩坑：Windows 没有 POSIX 权限位（`chmod` 只切只读），`session.json` 恒 `666` → 报告加 `windows` 标记，文案改「文件在用户目录下，权限位不生效」，`private` 在 Windows 下视为 true；`store.account` 不存在 → 改用 `this.api.authenticated/account`；`security.js` 自己的注释里 `https://lucide.dev` 被当成出网请求 → 跳过注释行。
+
+## 验证
+- `GET /music/api/security`：`checksSummary 4/4 全过`、`signedIn true`、`喝水去喝水`、cookie 937 字符、session 144 KB。
+- 页面 `GET /music/security` 200；1600/1100 两档无横向溢出，检查 4 条全绿。截图 `design/shots/mvp/security.png`、`security-1100.png`。
+- 全量 **80/80**（新增 `/music/security` 200、`/api/security` 结构 4 条检查、报告不含 cookie 值）。
