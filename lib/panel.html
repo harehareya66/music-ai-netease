@@ -405,7 +405,16 @@
       .hint { color: var(--muted); font-size: 12px; text-align: center; }
       .lyrics .hint, .details .hint { text-align: left; margin: 0; }
       .row-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 14px; }
-    </style>
+          .plan details.why { margin-top: 6px; }
+      .plan details.why summary { cursor: pointer; color: var(--muted); font-size: 11.5px; list-style: none; }
+      .plan details.why summary::-webkit-details-marker { display: none; }
+      .plan details.why summary::before { content: '▸ '; }
+      .plan details.why[open] summary::before { content: '▾ '; }
+      .plan details.why ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+      .plan details.why li { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; }
+      .plan details.why li span { color: #c9ccd3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .plan details.why li em { color: var(--muted); font-style: normal; flex: none; }
+</style>
   </head>
   <body>
     <div id="app">
@@ -1366,10 +1375,23 @@
         const djReason = heuristic
           ? '模型没连上，先按相似歌曲、榜单和你的口味兜底'
           : esc(dj.lastPlan?.vibe || '');
+        const reasons = Array.isArray(dj.lastPlan?.reasons) ? dj.lastPlan.reasons : [];
+        const why = reasons.length
+          ? `<details class="why"><summary>为什么是这些歌</summary><ul>${
+              reasons
+                .slice()
+                .reverse()
+                .slice(0, 8)
+                .map((entry) => `<li><span>${esc(entry.name)}</span><em>${esc(entry.reason || '补位候选')}</em></li>`)
+                .join('')
+            }</ul></details>`
+          : '';
         setHtml($('dj-status'), dj.enabled || dj.lastPlan
           ? `<div class="plan">${dj.busy ? esc(t('djPlanning')) : dj.error ? `AI DJ 失败：${esc(dj.error)}` : ''}${
               dj.lastPlan
-                ? `<div><b>+${dj.lastPlan.added}</b> 首 · ${djReason}</div><div class="muted">${esc((dj.lastPlan.names || []).slice(-3).join(' · '))}</div>`
+                ? `<div><b>+${dj.lastPlan.added}</b> 首 · ${djReason}</div>` +
+                  (dj.lastPlan.summary ? `<div class="muted">${esc(dj.lastPlan.summary)}</div>` : '') +
+                  why
                 : ''
             }${heuristic && dj.modelError ? `<div class="muted">想更准：在「AI DJ 模型」里选一个可用模型。</div>` : ''}</div>`
           : '');

@@ -285,6 +285,7 @@
           <div class="acts">
             <button class="ghostbtn" type="button" id="reorder">按 BPM 重排</button>
             <button class="ghostbtn" type="button" id="previewAll">试听全部</button>
+            <button class="ghostbtn" type="button" id="toDj" title="让 AI DJ 按这句场景开一场，会替换当前队列">交给 DJ 接着放</button>
           </div>
         </div>
         <div class="semantic" id="semantic"></div>
@@ -415,7 +416,7 @@
   }
   function setActionsDisabled(on){
     state.op = on;
-    var ids = ['#swap', '#reorder', '#previewAll', '#saveLocal'];
+    var ids = ['#swap', '#reorder', '#previewAll', '#toDj', '#saveLocal'];
     ids.forEach(function(id){ var b = $(id); if (b) b.disabled = on; });
     /* 写歌单接口已在 M0 验证（V2/V3），按钮随草稿状态启用 */
     $('#saveAccount').disabled = on || state.items.length === 0;
@@ -678,6 +679,25 @@
     toast('已按 BPM 从慢到快重排');
   }
 
+  async function handToDj(){
+    if (state.op || state.generating) return;
+    if (!state.items.length) { showError('草稿是空的，先生成再交给 DJ'); return; }
+    hideError();
+    setActionsDisabled(true);
+    try {
+      await request('__BASE__/api/dj', {
+        method: 'POST',
+        body: JSON.stringify({ enabled: true, start: true, prompt: state.brief || currentBrief(), count: 12 })
+      });
+      // 队列由 DJ 替换，播放器与浮空岛会自动同步过去；这里只报一句，避免抢走页面。
+      toast('AI DJ 已接手：按这句场景挑 12 首，去播放器看');
+    } catch (err) {
+      showError(err && err.message ? err.message : '交给 DJ 失败，请重试');
+    } finally {
+      setActionsDisabled(false);
+    }
+  }
+
   async function previewAll(){
     if (state.op || state.generating) return;
     if (!state.items.length) { showError('草稿是空的，先挑几首再试听'); return; }
@@ -801,6 +821,7 @@
 
     $('#reorder').addEventListener('click', reorder);
     $('#previewAll').addEventListener('click', previewAll);
+    $('#toDj').addEventListener('click', handToDj);
     $('#saveAccount').addEventListener('click', function(){ save('account'); });
     $('#saveLocal').addEventListener('click', function(){ save('local'); });
     $('#name').addEventListener('input', function(){ state.nameDirty = true; });

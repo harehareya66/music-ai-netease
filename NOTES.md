@@ -357,3 +357,18 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - `test/remix.test.mjs` 8 例（归一化/双字/重合度、首字、藏头报错、目标来源、两个 prompt 的硬约束）；全部 **68/68**。
 - API：`POST /api/lyric/remix` 两段不同 selection → 文本不同、analysis 不同、metrics `0.44 / 0.56`、`retried:false`；藏头 `targetChars:"零固固"`、`acrostic.ok:true`。
 - CDP（页面）：选第 2/5/8 行（5 行）→ 点「改写成诗」→ `本次发送 5 行`、分析卡「这 5 行…」、meta `与原词重合 68% · 模型 preview/preview-model`；切「藏头」→ 输入框自动填 `零飘你我载`、meta `藏头对上了「零飘你我载」`。截图 `design/shots/mvp/lyric-analysis.png`、`lyric-acrostic.png`。
+
+## 22. P3 AI DJ v2：每批歌说得出为什么，场景可交给 DJ（2026-10-24）
+
+用户原话：「AI DJ 看不出作用、能加歌但不给推荐理由，应该和场景/画像联动」。三处一起改：
+
+- **理由生成**（`lib/dj.js`）：`reasonForPick(track,{topArtists,terms,currentArtists})` 按优先级拼最多三段——boost（你刚说想多听这类 / 尽量避开你不想听的）、口味（你常听 X；没有就「接着 X 听」）、来源标签（`ORIGIN_LABEL`：按你说的搜到 / 你红心过、有一阵没听 / 私人 FM / 和你最近听的歌相似 / 每日推荐 / 新歌速递 / 榜单）、brief 命中（歌名/艺人有「X」）。
+- **批次摘要**：`summarizePicks({tracks,terms,prompt,source,route})` → `{summary,mix}`，例如「按「深夜 emo，别太吵」挑了 5 首：和你最近听的歌相似 3 首、按你说的搜到 2 首；容祖儿 占 3 首；模型没连上，用相似/榜单/口味排序」。
+- **贯通**：`#parseAnswer` 保留模型给的 `why`；`plan()` 统一产出 `tracks(带 reason) / reasons[{id,name,reason}] / summary / mix`，`topUp()`/`start()` 写进 `player.dj.lastPlan`；`/api/dj/test` 也返回 summary 与 reasons。
+- **界面**：面板 DJ 卡多一行 summary + 折叠「▸ 为什么是这些歌」（每条歌名 + 理由，最多 8 条）；`music_dj` 工具的返回与 render 也带 summary 和逐条「— 理由」；`/music/health` 的 dj 段加 `summary`/`reasons`。
+- **场景联动**：场景页草稿工具栏新增「交给 DJ 接着放」（title 提示会替换当前队列）→ `POST /api/dj {enabled:true,start:true,prompt:brief,count:12}`，成功 toast「AI DJ 已接手：按这句场景挑 12 首，去播放器看」，失败页内 errorbar；按钮纳入 `setActionsDisabled`。
+
+## 验证
+- `test/dj-plan.test.mjs` 6 例（理由优先级、来源标签、brief 命中、空输入、出处分布+艺人、无 brief/heuristic 文案）；全部 **74/74**。
+- 预览（假模型 → model tier 降级 heuristic，正好验降级文案）：`POST /api/dj {replan:true}` 后 `summary`「按「深夜 emo，别太吵」挑了 5 首：和你最近听的歌相似 3 首、按你说的搜到 2 首；容祖儿 占 3 首；模型没连上，用相似/榜单/口味排序」、`reasons` 逐条有理由、`mix {similar:3,prompt:2}`；`{start:true,count:12}` 把队列替换成 12 首。
+- CDP：面板点「开始 DJ」→ 摘要行出现、展开折叠看到 5 条「歌名 — 理由」；场景页（深链生成 12 首）点「交给 DJ 接着放」→ toast 出现、队列变成 DJ 的 12 首。截图 `design/shots/mvp/panel-dj-why.png`、`scene-to-dj.png`。
