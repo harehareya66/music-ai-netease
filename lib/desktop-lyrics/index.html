@@ -25,6 +25,7 @@
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
     }
     #lines div {
+      width: max-content; max-width: 100%; margin: 0 auto;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       transition: color 160ms ease, opacity 160ms ease;
     }
@@ -118,6 +119,20 @@
       }
       titleEl.textContent = next.title || '';
       playBtn.textContent = next.playing ? '⏸' : '▶';
+      requestAnimationFrame(() => requestAnimationFrame(fitWindow));
+    }
+
+    /* The window is sized to the lyrics instead of a fixed 900×174 box: a wide
+       empty box made the widget look "huge and misaligned" on screen. */
+    function fitWindow() {
+      const lines = Array.from(linesEl.children);
+      if (!lines.length) return;
+      let width = 320;
+      for (const el of lines) width = Math.max(width, Math.ceil(el.offsetWidth || 0));
+      width = Math.min(900, Math.max(340, width + 40));
+      const lineHeight = lines.reduce((sum, el) => sum + (el.offsetHeight || 0), 0);
+      const height = Math.min(420, Math.max(92, lineHeight + 42));
+      if (typeof api.resize === 'function') api.resize(width, height).catch(() => {});
     }
 
     api.onUpdate(render);
