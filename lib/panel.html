@@ -1817,6 +1817,29 @@
       // 宿主不给就退到普通弹出窗，再不行退到页内浮层。播放始终不在这里。
       function openLyricsFloat() {
         const url = `${BASE}/lyric-window?base=${encodeURIComponent(BASE)}`;
+        // 面板本身是壳里的 iframe：只有把浮窗挂到壳文档上，它才能跨面板存活。
+        if (window.parent && window.parent !== window) {
+          let settled = false;
+          const onAck = (event) => {
+            if (event.data && event.data.type === 'ncm-widget-mounted') {
+              settled = true;
+              window.removeEventListener('message', onAck);
+            }
+          };
+          window.addEventListener('message', onAck);
+          try {
+            window.parent.postMessage({ type: 'ncm-open-lyrics', url: url + '&embed=1' }, '*');
+          } catch { /* cross-origin host: fall through below */ }
+          setTimeout(() => {
+            window.removeEventListener('message', onAck);
+            if (!settled) openLyricsFallback(url);
+          }, 280);
+          return;
+        }
+        openLyricsFallback(url);
+      }
+
+      function openLyricsFallback(url) {
         const pip = window.documentPictureInPicture;
         if (pip && typeof pip.requestWindow === 'function') {
           pip.requestWindow({ width: 560, height: 320 }).then(async (win) => {

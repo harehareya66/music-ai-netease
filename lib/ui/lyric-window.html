@@ -7,20 +7,20 @@
 <script src="__BASE__/theme.js" defer></script>
 <style>
   :root {
-    --bg: #0b0d10;
-    --card: rgba(17, 19, 24, 0.86);
-    --text: #e8eaed;
-    --muted: #8b909a;
-    --dim: #5c616b;
+    --text: #eef0f3;
+    --muted: #9aa0aa;
+    --dim: #6a707a;
     --red: #e5484d;
-    --line: rgba(255, 255, 255, 0.10);
+    --line: rgba(255, 255, 255, 0.12);
     --font: 22px;
     --alpha: 1;
+    --surface: rgba(12, 14, 18, 0);
+    --shadow: 0 0 18px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.75);
+    --radius: 14px;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; background: transparent; }
   body {
-    background: radial-gradient(120% 140% at 50% 0%, #171a20 0%, var(--bg) 62%);
     color: var(--text);
     font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
     -webkit-user-select: none;
@@ -32,14 +32,12 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--card);
-    opacity: var(--alpha);
-    border-radius: 14px;
+    background: var(--surface);
+    border-radius: var(--radius);
     overflow: hidden;
-    transition: opacity 160ms ease;
   }
+  html[data-bg='none'] .line { text-shadow: var(--shadow); }
 
-  /* 拖动：顶部细条与歌词空白区都可拖（Electron 的 app-region）。 */
   .grab { height: 22px; flex: none; -webkit-app-region: drag; cursor: grab; }
   .stage {
     flex: 1;
@@ -49,22 +47,26 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 0 24px 6px;
+    gap: 8px;
+    padding: 0 22px 4px;
     text-align: center;
   }
   .line { max-width: 100%; line-height: 1.45; transition: color 180ms ease, opacity 180ms ease; }
-  .line.prev, .line.next { font-size: calc(var(--font) * 0.62); color: var(--dim); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .line.prev, .line.next { font-size: calc(var(--font) * 0.62); color: var(--muted); opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .line.now { font-size: var(--font); font-weight: 600; color: var(--text); }
   .line.now.active { color: var(--red); }
-  .line.plain { font-size: calc(var(--font) * 0.64); color: var(--muted); }
+  .line.plain { font-size: calc(var(--font) * 0.62); color: var(--muted); }
 
   .chrome {
     flex: none;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px 10px;
+    gap: 6px;
+    margin: 0 8px 8px;
+    padding: 5px 8px;
+    border-radius: 10px;
+    background: rgba(12, 14, 18, 0.72);
+    border: 1px solid var(--line);
     color: var(--muted);
     font-size: 11px;
     opacity: 0;
@@ -75,62 +77,58 @@
   .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .title b { color: var(--text); font-weight: 500; }
   button {
-    appearance: none; border: 0; background: rgba(255, 255, 255, 0.06);
-    color: var(--text); width: 28px; height: 28px; border-radius: 999px;
+    appearance: none; border: 0; background: rgba(255, 255, 255, 0.07);
+    color: var(--text); width: 26px; height: 26px; border-radius: 8px;
     display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-    -webkit-app-region: no-drag;
+    -webkit-app-region: no-drag; flex: none;
   }
-  button:hover { background: rgba(255, 255, 255, 0.14); }
-  button.play { background: var(--red); color: #fff; width: 32px; height: 32px; }
-  button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  button:hover { background: rgba(255, 255, 255, 0.15); }
+  button.play { background: var(--red); color: #fff; }
+  button svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tools { display: flex; align-items: center; gap: 6px; flex: none; }
+  .tools .sep { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
 
-  /* 靠近 → 弹出设置面板；移开自动收起（点了齿轮则固定）。 */
   .panel {
-    position: absolute; left: 8px; right: 8px; bottom: 8px;
+    position: absolute; left: 8px; right: 8px; bottom: 44px;
     -webkit-app-region: no-drag;
-    background: rgba(12, 14, 18, 0.97);
+    background: rgba(10, 12, 16, 0.96);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 10px 12px 12px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    padding: 10px 12px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
     opacity: 0; pointer-events: none; transform: translateY(6px);
     transition: opacity 160ms ease, transform 160ms ease;
   }
-  .widget:hover .panel, .panel.pinned { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .panel.pinned { opacity: 1; pointer-events: auto; transform: translateY(0); }
   .panel .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
   .panel .row:first-child { margin-top: 0; }
-  .panel .row .lab { flex: 0 0 44px; color: var(--dim); }
-  .panel .row .val { width: 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  .panel .row .lab { flex: 0 0 40px; color: var(--dim); }
+  .panel .row .val { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
   .panel input[type='range'] { flex: 1; min-width: 0; accent-color: var(--red); height: 14px; }
   .panel .seg { display: flex; gap: 4px; }
-  .panel .seg button { width: 30px; height: 24px; border-radius: 7px; font-size: 11px; color: var(--muted); }
-  .panel .seg button.on { color: var(--text); background: rgba(229, 72, 77, 0.22); }
-  .panel .seg button[data-lines] { width: auto; padding: 0 8px; }
-  .panel .act { margin-left: auto; display: flex; gap: 6px; }
-  .panel .act button { width: auto; padding: 0 10px; height: 24px; font-size: 11px; border-radius: 7px; }
-  .panel .act button.danger { color: #ffb4b6; background: rgba(229, 72, 77, 0.16); }
-  .lock-note { display: none; position: absolute; left: 10px; bottom: 8px; font-size: 10.5px; color: var(--dim); }
+  .panel .seg button { width: 28px; height: 22px; border-radius: 6px; font-size: 11px; color: var(--muted); }
+  .panel .seg button.on { color: var(--text); background: rgba(229, 72, 77, 0.24); }
+  .panel .seg button[data-lines], .panel .seg button[data-bg] { width: auto; padding: 0 8px; }
   .lock-badge {
-    position: absolute; right: 10px; top: 10px; width: 22px; height: 22px; border-radius: 50%;
-    display: none; place-items: center; background: rgba(12, 14, 18, 0.82); border: 1px solid var(--line);
+    position: absolute; right: 8px; top: 8px; width: 22px; height: 22px; border-radius: 50%;
+    display: none; place-items: center; background: rgba(12, 14, 18, 0.65); border: 1px solid var(--line);
     color: var(--muted); cursor: pointer; -webkit-app-region: no-drag;
   }
   .lock-badge:hover { color: var(--text); }
-  .lock-badge svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; }
-
-  /* 锁定：藏起所有控件、停用拖动；页内浮层模式下父页面会把点击透给下层。 */
+  .lock-note { display: none; position: absolute; left: 10px; bottom: 6px; font-size: 10px; color: var(--dim); }
   html[data-locked='1'] .chrome,
-  html[data-locked='1'] .panel { opacity: 0; pointer-events: none; }
+  html[data-locked='1'] .panel {
+    opacity: 0 !important; pointer-events: none !important; visibility: hidden;
+  }
   html[data-locked='1'] .lock-badge { display: grid; }
   html[data-locked='1'] .grab,
   html[data-locked='1'] .stage { -webkit-app-region: none; cursor: default; }
   html[data-locked='1'] .lock-note { display: block; }
-  #msg { color: var(--dim); font-size: 12px; }
 </style>
 </head>
 <body>
   <div class="widget" id="widget">
-    <div class="grab" title="按住拖动窗口"></div>
+    <div class="grab" title="按住拖动"></div>
     <div class="stage" id="stage">
       <div class="line plain" id="msg">正在等播放器…</div>
     </div>
@@ -139,40 +137,31 @@
       <button id="play" class="play" title="播放/暂停" aria-label="播放或暂停"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
       <button id="next" title="下一首" aria-label="下一首"><svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></svg></button>
       <span class="title" id="title"></span>
-      <button id="gear" title="设置" aria-label="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.4 2h-4.8l-.4 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L5.1 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.6h4.8l.4-2.6a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg></button>
+      <span class="tools">
+        <button id="gear" title="设置" aria-label="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.4 2h-4.8l-.4 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L5.1 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.6h4.8l.4-2.6a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg></button>
+        <span class="sep"></span>
+        <button id="lock" title="锁定：只留歌词" aria-label="锁定"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></button>
+        <button id="close" title="关闭歌词窗" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </span>
     </div>
     <div class="lock-badge" id="unlock" title="点击解锁" role="button" aria-label="解锁">
       <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
     </div>
-    <div class="lock-note">已锁定 · 只显示歌词（点右上角解锁）</div>
+    <div class="lock-note">已锁定 · 点右上角解锁</div>
     <div class="panel" id="panel">
-      <div class="row">
-        <span class="lab">字号</span>
-        <div class="seg">
-          <button type="button" data-font="-2">A−</button>
-          <button type="button" data-font="2">A+</button>
-        </div>
+      <div class="row"><span class="lab">字号</span>
+        <div class="seg"><button type="button" data-font="-2">A−</button><button type="button" data-font="2">A+</button></div>
         <span class="val" id="fontVal">22px</span>
       </div>
-      <div class="row">
-        <span class="lab">行数</span>
-        <div class="seg" id="lineSeg">
-          <button type="button" data-lines="1">1</button>
-          <button type="button" data-lines="3" class="on">3</button>
-          <button type="button" data-lines="5">5</button>
-        </div>
+      <div class="row"><span class="lab">行数</span>
+        <div class="seg" id="lineSeg"><button type="button" data-lines="1">1</button><button type="button" data-lines="3" class="on">3</button><button type="button" data-lines="5">5</button></div>
       </div>
-      <div class="row">
-        <span class="lab">透明度</span>
-        <input type="range" id="alpha" min="35" max="100" step="5" value="100" />
+      <div class="row"><span class="lab">背景</span>
+        <div class="seg" id="bgSeg"><button type="button" data-bg="none">透明</button><button type="button" data-bg="glass">毛玻璃</button><button type="button" data-bg="card">卡片</button></div>
+      </div>
+      <div class="row"><span class="lab">文字</span>
+        <input type="range" id="alpha" min="45" max="100" step="5" value="100" />
         <span class="val" id="alphaVal">100%</span>
-      </div>
-      <div class="row">
-        <span class="lab">窗口</span>
-        <div class="act">
-          <button type="button" id="lock">锁定</button>
-          <button type="button" id="close" class="danger">关闭</button>
-        </div>
       </div>
     </div>
   </div>
@@ -183,16 +172,16 @@
     try { return new URLSearchParams(location.search).get('base') || ''; } catch (e) { return ''; }
   })() || (location.pathname.split('/lyric-window')[0] || '')).replace(/\/$/, '');
   var API = BASE + '/api';
+  var EMBED = /[?&]embed=1/.test(location.search);
   var state = null;
   var lyrics = null;
   var lines = [];
   var lyricId = null;
   var lastTrackId = null;
   var lastFetchAt = 0;
-  var prefs = { font: 22, lines: 3, alpha: 100, locked: false };
+  var prefs = { font: 22, lines: 3, alpha: 100, locked: false, bg: EMBED ? 'none' : 'card' };
   try { prefs = Object.assign(prefs, JSON.parse(localStorage.getItem('ncm-widget') || '{}')); } catch (e) {}
 
-  /* 作词/作曲这类制作人员行不进滚播：它们不是歌词。 */
   function isCapsCredit(text) {
     var t = String(text || '').trim();
     if (!t || /[a-z一-鿿]/.test(t)) return false;
@@ -204,6 +193,11 @@
   var titleEl = document.getElementById('title');
   var panel = document.getElementById('panel');
 
+  function surfaceFor(bg) {
+    if (bg === 'glass') return 'rgba(12, 14, 18, 0.62)';
+    if (bg === 'card') return 'rgba(12, 14, 18, 0.94)';
+    return 'rgba(12, 14, 18, 0)';
+  }
   function savePrefs() {
     try { localStorage.setItem('ncm-widget', JSON.stringify(prefs)); } catch (e) {}
   }
@@ -211,15 +205,20 @@
     var root = document.documentElement;
     root.style.setProperty('--font', prefs.font + 'px');
     root.style.setProperty('--alpha', String(prefs.alpha / 100));
+    root.style.setProperty('--surface', surfaceFor(prefs.bg));
     root.dataset.locked = prefs.locked ? '1' : '0';
+    root.dataset.bg = prefs.bg;
     document.getElementById('fontVal').textContent = prefs.font + 'px';
     document.getElementById('alpha').value = String(prefs.alpha);
     document.getElementById('alphaVal').textContent = prefs.alpha + '%';
-    document.getElementById('lock').textContent = prefs.locked ? '解锁' : '锁定';
+    stage.style.opacity = String(prefs.alpha / 100);
     Array.prototype.forEach.call(document.querySelectorAll('#lineSeg button'), function (b) {
       b.classList.toggle('on', Number(b.getAttribute('data-lines')) === prefs.lines);
     });
-    if (window.parent !== window) {
+    Array.prototype.forEach.call(document.querySelectorAll('#bgSeg button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-bg') === prefs.bg);
+    });
+    if (window.parent !== window && EMBED) {
       try { window.parent.postMessage({ type: 'ncm-widget-lock', locked: prefs.locked }, '*'); } catch (e) {}
     }
   }
@@ -237,7 +236,6 @@
       body: JSON.stringify(body || {})
     }).catch(function () { /* 遥控失败不打扰 */ });
   }
-
   function positionMs() {
     if (!state) return 0;
     if (state.playing && state.reported && state.reported.at) {
@@ -245,14 +243,12 @@
     }
     return Number(state.reported && state.reported.position || 0);
   }
-
   function lineEl(cls, text) {
     var d = document.createElement('div');
     d.className = 'line ' + cls;
     d.textContent = text || '';
     return d;
   }
-
   function renderLines() {
     stage.textContent = '';
     if (!state || !state.current) {
@@ -288,7 +284,6 @@
       : '<path d="M8 5v14l11-7z"/>';
     document.getElementById('play').title = playing ? '暂停' : '播放';
   }
-
   function ensureLyrics() {
     if (!state || !state.current) return Promise.resolve();
     var id = state.current.id;
@@ -314,7 +309,6 @@
         renderLines();
       });
   }
-
   function tick() {
     apiGet('/state')
       .then(function (next) {
@@ -338,42 +332,38 @@
   bind('prev', function () { post('/control', { action: 'previous' }); setTimeout(tick, 240); });
   bind('next', function () { post('/control', { action: 'next' }); setTimeout(tick, 240); });
   bind('play', function () { post('/control', { action: 'toggle' }); setTimeout(tick, 240); });
-  bind('close', function () { window.close(); });
-  bind('lock', function () {
-    prefs.locked = !prefs.locked;
-    if (!prefs.locked) panel.classList.remove('pinned');
-    savePrefs();
-    applyPrefs();
+  bind('close', function () {
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ type: 'ncm-widget-close' }, '*'); } catch (e) {}
+    }
+    window.close();
   });
-
-  /* 点齿轮：固定/收起设置面板（鼠标移开也不收）。 */
+  bind('lock', function () { prefs.locked = true; savePrefs(); applyPrefs(); });
   bind('gear', function () { panel.classList.toggle('pinned'); });
   var unlockBtn = document.getElementById('unlock');
-  if (unlockBtn) unlockBtn.addEventListener('click', function () {
-    prefs.locked = false;
-    savePrefs();
-    applyPrefs();
-  });
+  if (unlockBtn) unlockBtn.addEventListener('click', function () { prefs.locked = false; savePrefs(); applyPrefs(); });
 
   Array.prototype.forEach.call(document.querySelectorAll('[data-font]'), function (b) {
     b.addEventListener('click', function () {
       prefs.font = Math.min(40, Math.max(14, prefs.font + Number(b.getAttribute('data-font'))));
-      savePrefs();
-      applyPrefs();
+      savePrefs(); applyPrefs();
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-lines]'), function (b) {
     b.addEventListener('click', function () {
       prefs.lines = Number(b.getAttribute('data-lines'));
-      savePrefs();
-      applyPrefs();
-      renderLines();
+      savePrefs(); applyPrefs(); renderLines();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bg]'), function (b) {
+    b.addEventListener('click', function () {
+      prefs.bg = b.getAttribute('data-bg');
+      savePrefs(); applyPrefs();
     });
   });
   document.getElementById('alpha').addEventListener('input', function () {
     prefs.alpha = Number(this.value);
-    savePrefs();
-    applyPrefs();
+    savePrefs(); applyPrefs();
   });
 
   applyPrefs();
@@ -382,6 +372,12 @@
 
   window.addEventListener('message', function (event) {
     var data = event.data || {};
+    if (data && data.type === 'ncm-widget-unlock') {
+      prefs.locked = false;
+      savePrefs();
+      applyPrefs();
+      return;
+    }
     if (data && data.type === 'ncm-theme' && data.tokens) {
       Object.keys(data.tokens).forEach(function (name) {
         document.documentElement.style.setProperty(name, data.tokens[name]);
