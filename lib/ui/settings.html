@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>设置 · 音乐</title>
+<script src="__BASE__/theme.js" defer></script>
 <style>
   :root {
     --bg: #0f1115;
@@ -166,8 +167,8 @@
     </section>
 
     <section class="card">
-      <h2>外观 <span class="badge warn">下一阶段 P7</span></h2>
-      <p class="hint">这里先存下选择；页面的模板与字号会在外观阶段接上，默认跟随 DSH。</p>
+      <h2>外观</h2>
+      <p class="hint">模板默认跟随 DSH；字号只影响插件自己的页面（播放器面板仍跟 DSH）。保存后立即生效。</p>
       <div class="row">
         <span class="label">模板</span>
         <select id="templateSelect">
@@ -349,6 +350,8 @@
       paintRest();
       setMsg('modelMsg', view.issues && view.issues.length ? ('已保存，但有项被忽略：' + view.issues.join('；')) : '已保存。DJ 和二创从下一次调用起用新设置。', 'ok');
       toast('设置已保存');
+      // Template and font scale take effect without a reload.
+      if (window.__ncmThemeRefresh) window.__ncmThemeRefresh();
     }).catch(function (error) {
       setMsg('modelMsg', '保存失败：' + error.message, 'bad');
     }).then(function () {

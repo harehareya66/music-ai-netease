@@ -420,3 +420,17 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - `GET /music/api/security`：`checksSummary 4/4 全过`、`signedIn true`、`喝水去喝水`、cookie 937 字符、session 144 KB。
 - 页面 `GET /music/security` 200；1600/1100 两档无横向溢出，检查 4 条全绿。截图 `design/shots/mvp/security.png`、`security-1100.png`。
 - 全量 **80/80**（新增 `/music/security` 200、`/api/security` 结构 4 条检查、报告不含 cookie 值）。
+
+## 26. P7 主题模板与字号（2026-10-24）
+
+设置页外观卡真正生效：模板 auto/dark/light，字号 85%–130%，保存即生效。
+
+- **桥**：`lib/client.js` 新增 `startThemeBridge(ctx)`——读壳上的 `data-ds-dark-theme`（没有就看 `prefers-color-scheme`），变化时（MutationObserver + 5s 轮询去重）`POST /api/theme {resolved}`；插件内存里 `hostTheme` 存着，`GET /api/theme` 返回 `{template, scale, host, effective}`，`effective = template==='auto' ? host||'dark' : template`。
+- **页面**：新增 `lib/ui/theme.js`（路由 `/music/theme.js`），九个页面在 `<title>` 后引它；拿到 `/api/theme` 后给 `<html>` 打 `data-ncm-theme`、`data-ncm-template` 与 `ncm-light`，并 `body.style.zoom = scale`。设置页保存后直接调 `window.__ncmThemeRefresh()`，其它已开标签页在 visibilitychange 时刷新。
+- **浅色怎么做的**：这些页面是按深色手调的颜色（几十处硬编码 hex），只换 CSS 变量会留一半深色 chrome。方案是把内容层整体 `filter: invert(1) hue-rotate(180deg)`，再把 `img/video/canvas` 反向再筛一次（双重反转=原色，封面不变负片），`body` 背景直接给浅色，浮空岛（`.ncm-island`）排除在外保持深色。实测两页（画像/周报/曲库）红仍是红、灰阶仍是灰阶、封面正常。
+- **口径**：播放器面板（基座 `panel.html`）继续跟 DSH 自身的 `data-theme`，不吃这里的模板；字号只作用于插件独立页，避免把基座播放器布局改坏。
+
+## 验证
+- API：`GET /api/theme` 默认 `{template:'auto',effective:'dark'}`；POST `{resolved:'light'}` 后 `host.resolved:'light'、effective:'light'`；设置 `ui.template:'dark'` 后 `effective:'dark'`；`scale:1.2` 透传；非法 resolved → 400。
+- 页面（CDP，1600×950）：`theme:light tmpl:auto zoom:1`（画像页浅色）、`theme:dark tmpl:dark`（强制深色覆盖壳）、`theme:light tmpl:auto zoom:1.2`（周报放大 120%），三例 `scrollWidth===clientWidth` 无横向溢出。截图 `design/shots/mvp/theme-light.png`、`theme-light-scale.png`。
+- 全量 **81/81**（新增主题合并用例）。

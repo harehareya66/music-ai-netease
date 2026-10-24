@@ -281,3 +281,30 @@ test('security page and report expose the audit without leaking secrets', async 
     plugin.dispose();
   }
 });
+
+test('theme bridge merges the shell template with the saved ui settings', async () => {
+  const plugin = mount();
+  try {
+    const initial = await plugin.call('/music/api/theme');
+    assert.equal(initial.status, 200);
+    assert.equal(initial.json.effective, 'dark');
+
+    const posted = await plugin.call('/music/api/theme', 'POST', { resolved: 'light' });
+    assert.equal(posted.status, 200);
+    const merged = await plugin.call('/music/api/theme');
+    assert.equal(merged.json.host.resolved, 'light');
+    assert.equal(merged.json.effective, 'light');
+
+    const forced = await plugin.call('/music/api/settings', 'POST', { ui: { template: 'dark', fontScale: 1.2 } });
+    assert.equal(forced.status, 200);
+    const after = await plugin.call('/music/api/theme');
+    assert.equal(after.json.template, 'dark');
+    assert.equal(after.json.effective, 'dark');
+    assert.equal(after.json.scale, 1.2);
+
+    const bad = await plugin.call('/music/api/theme', 'POST', { resolved: 'blue' });
+    assert.equal(bad.status, 400);
+  } finally {
+    plugin.dispose();
+  }
+});
