@@ -1816,6 +1816,9 @@
       // 悬浮歌词窗：优先进 Document PiP（真正的独立小窗、常在前），
       // 宿主不给就退到普通弹出窗，再不行退到页内浮层。播放始终不在这里。
       function openLyricsFloat() {
+        // A PiP window left over from an older build would sit on top of the
+        // shell widget — close it before mounting the new one.
+        try { window.documentPictureInPicture?.window?.close(); } catch (e) {}
         const url = `${BASE}/lyric-window?base=${encodeURIComponent(BASE)}`;
         // 面板本身是壳里的 iframe：只有把浮窗挂到壳文档上，它才能跨面板存活。
         if (window.parent && window.parent !== window) {

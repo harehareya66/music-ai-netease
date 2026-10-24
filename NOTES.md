@@ -588,3 +588,16 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 ## 验证
 - DOM 挂件（真实 client.js + file:// harness，CDP 真鼠标）：背景 `rgba(0,0,0,0)`、host `pointer-events:none`、空白处 `elementFromPoint` 落在页面上、拖动 (812,590)→(692,510)、点 `closeDot` 可移除、锁定后整层 `pointer-events:none`。
 - 桌面窗（DPI-aware PowerShell 真鼠标）：从歌词中部拖动 (366,1012)→(441,1052)；点 × 关闭；锁定后同样拖动位置不变（穿透成立）；点右上 🔓 解锁后拖动恢复；连续 start 两次窗口数恒为 1。
+
+## 32. 悬浮歌词 0.3.3：窗口贴合文字、与浮空岛错开、清掉旧 PiP（2026-10-24）
+
+用户 0.3.2 反馈三件事：桌面窗从「虚拟 — 陈粒」到控制条之间空一大块、看着大且错位；DSH 内歌词挂件和底部浮空岛重叠；音乐页上还留着一份「老歌词」。
+
+- **桌面窗尺寸**：固定 900×174 改成按内容自适应 —— renderer 用每行 `offsetWidth`（`#lines div` 设 `width:max-content; margin:0 auto`）算宽度，按行高之和算高度，通过新 IPC `ncm:resize` 调 `win.setBounds`；宽度夹在 340–900、高度 92–420，窗口左上角锚定、越界会被拉回工作区。
+- **与浮空岛重叠**：DOM 挂件默认位置从「右下 72% 高度」改成「水平居中、`innerHeight - height - 132`」，正好落在浮空岛上沿之上；用户拖动过的位置仍按 `ncm-widget-dom-v2` 记忆。
+- **旧歌词残留**：`lib/panel.html` 与 `lib/ui/mini.js` 在请求壳挂件前先关闭已有的 Document PiP 窗（`documentPictureInPicture.window.close()`），避免旧版 PiP 浮在壳挂件上面。
+- **配套**：`lib/desktop-lyrics/preload.js` 暴露 `resize`；`main.js` 新增 `ncm:resize` 处理器；控制条仍只在悬停时出现。
+
+## 验证
+- 桌面窗：720×366 物理像素（200% 缩放下 360×183 CSS）刚好包住 5 行歌词，控制条贴底；`Ctrl+Alt+L` 锁定后穿透、`Ctrl+Alt+X` 关闭仍有效。
+- DOM 挂件（1400×820 harness）：位置 (420,538)、高 128，底边 666，浮空岛顶边约 740，两者不再重叠；锁定/解锁、拖动、关闭全部通过。
