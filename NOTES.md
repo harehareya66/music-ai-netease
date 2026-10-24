@@ -434,3 +434,14 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - API：`GET /api/theme` 默认 `{template:'auto',effective:'dark'}`；POST `{resolved:'light'}` 后 `host.resolved:'light'、effective:'light'`；设置 `ui.template:'dark'` 后 `effective:'dark'`；`scale:1.2` 透传；非法 resolved → 400。
 - 页面（CDP，1600×950）：`theme:light tmpl:auto zoom:1`（画像页浅色）、`theme:dark tmpl:dark`（强制深色覆盖壳）、`theme:light tmpl:auto zoom:1.2`（周报放大 120%），三例 `scrollWidth===clientWidth` 无横向溢出。截图 `design/shots/mvp/theme-light.png`、`theme-light-scale.png`。
 - 全量 **81/81**（新增主题合并用例）。
+
+## 27. P8 回归与 0.2.0 发布（2026-10-24）
+
+把 P1–P7 打包成可安装版本。
+
+- 版本 `0.2.0`（tarball 264 KB，含 `lib/ui/theme.js`、`security.html`、`lyric-window.html`）。
+- 回归（preview 全新进程）：十个页面 `panel/library/taste/weekly/scene/lyric/settings/dev/security/lyric-window` 全 200；八个接口 `state/taste/report/library/security/theme/dev/quality` 全 200；测试 **81/81**；`check-panel` 通过（九个页面的内联脚本都能编译）。
+- 装进 `~/.dsh/profiles/desktop`：`packages/ncm-plugin-0.2.0.tgz` + `dependencies["ncm-plugin"]="file:./packages/ncm-plugin-0.2.0.tgz"`，用 DSH 自带 pnpm `install --prefer-offline` → `ncm-plugin 0.2.0`；确认 `node_modules/ncm-plugin/package.json` 为 0.2.0、`lib/client.js` 的 id 仍是 `ncm-plugin`（= 包名，崩溃那条教训）。
+- 需要重启 DSH 才能让运行中的 GUI 加载 0.2.0（当前进程里还是 0.1.1 的模块实例）。重启后先看 `/music/dev`（检查台）与 `/music/security`。
+- 发布：本地 `git tag v0.2.0`；GitHub 仓库 `harehareya66/music-ai-netease` 用 REST API 同步到 `96deb21`（push 443 仍不通，脚本 `%TEMP%\ncm-upload.mjs`，需 `NODE_OPTIONS=--use-system-ca` 绕卡巴斯基 MITM）。
+- 安装副作用：profile 里 `billion-context` 由 pnpm 顺带从 0.1.201 升到 0.1.204（同一 semver 范围），与本插件无关。
