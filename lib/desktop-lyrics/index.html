@@ -37,8 +37,8 @@
       border: 1px solid rgba(255, 255, 255, 0.12);
       opacity: 0; transition: opacity 160ms ease; -webkit-app-region: no-drag;
     }
-    body:hover #chrome { opacity: 1; }
-    body:hover #title { opacity: 0.55; }
+    body.hover #chrome { opacity: 1; }
+    body.hover #title { opacity: 0.55; }
     #chrome button {
       border: 0; background: transparent; color: #e8eaed; cursor: pointer;
       font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 6px;
@@ -108,6 +108,9 @@
     }
 
     api.onUpdate(render);
+    if (typeof api.onHover === 'function') {
+      api.onHover((next) => body.classList.toggle('hover', Boolean(next)));
+    }
 
     document.getElementById('prev').addEventListener('click', () => fetchCommand('previous'));
     playBtn.addEventListener('click', () => fetchCommand('toggle'));
@@ -125,22 +128,29 @@
       api.control(action).catch(() => {});
     }
 
-    /* Locked windows ignore the mouse entirely; Chromium still forwards
-       mousemove. Hit-test the unlock badge and briefly turn interaction back on
-       only while the pointer is over it, so the rest of the window stays
-       click-through. */
+    /* The window ignores the mouse by default (forwarding still delivers
+       mousemove here). Only real controls — the drag strip, the control bar and
+       the unlock badge — ask the main process to accept clicks; everything else
+       lets the click fall through to whatever is underneath. Locked windows
+       answer only to the unlock badge. */
+    function hitTest(event) {
+      const el = event.target instanceof Element ? event.target : null;
+      if (!el) return false;
+      if (locked) return Boolean(el.closest('#unlock'));
+      return Boolean(el.closest('#chrome') || el.closest('#drag'));
+    }
+
     window.addEventListener('mousemove', (event) => {
-      if (!locked) {
-        if (interactive) { interactive = false; api.interactive(false); }
-        return;
-      }
-      const rect = unlockBtn.getBoundingClientRect();
-      const inside = event.clientX >= rect.left - 4 && event.clientX <= rect.right + 4
-        && event.clientY >= rect.top - 4 && event.clientY <= rect.bottom + 4;
+      const inside = hitTest(event);
       if (inside !== interactive) {
         interactive = inside;
         api.interactive(inside);
       }
+      body.classList.toggle('hover', inside);
+    });
+    window.addEventListener('mouseleave', () => {
+      if (interactive) { interactive = false; api.interactive(false); }
+      body.classList.remove('hover');
     });
   </script>
 </body>
