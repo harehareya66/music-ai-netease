@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>桌面歌词</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    body {
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      color: #e8eaed;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #root { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; }
+    #drag {
+      position: absolute; left: 0; right: 0; top: 0; height: 26px;
+      -webkit-app-region: drag; app-region: drag; cursor: move;
+    }
+    #lines {
+      flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+      padding: 10px 24px; text-align: center; pointer-events: none;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45);
+    }
+    #lines div {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: color 160ms ease, opacity 160ms ease;
+    }
+    #lines div.current { color: #e5484d; font-weight: 600; }
+    #lines div:not(.current) { opacity: 0.66; }
+    #title {
+      position: absolute; left: 16px; bottom: 6px; font-size: 11px; opacity: 0;
+      transition: opacity 160ms ease; pointer-events: none;
+    }
+    #chrome {
+      position: absolute; right: 12px; bottom: 6px; display: flex; align-items: center; gap: 2px;
+      padding: 3px 6px; border-radius: 999px; background: rgba(10, 12, 16, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      opacity: 0; transition: opacity 160ms ease; -webkit-app-region: no-drag;
+    }
+    body:hover #chrome { opacity: 1; }
+    body:hover #title { opacity: 0.55; }
+    #chrome button {
+      border: 0; background: transparent; color: #e8eaed; cursor: pointer;
+      font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 6px;
+    }
+    #chrome button:hover { background: rgba(255, 255, 255, 0.12); }
+    #unlock {
+      position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%;
+      display: none; place-items: center; padding: 0; font-size: 11px; line-height: 1;
+      border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(10, 12, 16, 0.6);
+      color: #c8ccd4; cursor: pointer; opacity: 0.18; transition: opacity 160ms ease;
+    }
+    body.locked #chrome, body.locked #title { display: none; }
+    body.locked #unlock { display: grid; }
+    body.locked #drag { display: none; }
+    #unlock:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="drag" title="按住拖动"></div>
+    <div id="lines"><div>连接播放器…</div></div>
+    <div id="title"></div>
+    <div id="chrome">
+      <button id="prev" title="上一首">⏮</button>
+      <button id="play" title="播放/暂停">▶</button>
+      <button id="next" title="下一首">⏭</button>
+      <button id="font" title="字号">Aa</button>
+      <button id="lock" title="锁定（点击穿透）">🔒</button>
+      <button id="close" title="关闭">×</button>
+    </div>
+    <button id="unlock" title="解锁">🔓</button>
+  </div>
+  <script>
+    const api = window.ncmDesktop;
+    const linesEl = document.getElementById('lines');
+    const titleEl = document.getElementById('title');
+    const body = document.body;
+    const playBtn = document.getElementById('play');
+    const unlockBtn = document.getElementById('unlock');
+
+    let locked = false;
+    let interactive = false;
+    let payload = null;
+    let fontScale = Number(localStorage.getItem('ncm-desktop-font') || 0) || 0;
+
+    function render(next) {
+      payload = next;
+      locked = Boolean(next.locked);
+      body.classList.toggle('locked', locked);
+      const font = Math.max(14, Math.min(48, (next.font || 26) + fontScale));
+      linesEl.innerHTML = '';
+      for (const line of next.lines || []) {
+        const div = document.createElement('div');
+        div.textContent = line.text;
+        div.className = line.current ? 'current' : '';
+        div.style.fontSize = line.current ? font + 'px' : Math.round(font * 0.82) + 'px';
+        linesEl.appendChild(div);
+      }
+      if (!(next.lines || []).length) {
+        const div = document.createElement('div');
+        div.textContent = '播放器里没有在放的歌';
+        div.style.fontSize = Math.round(font * 0.8) + 'px';
+        linesEl.appendChild(div);
+      }
+      titleEl.textContent = next.title || '';
+      playBtn.textContent = next.playing ? '⏸' : '▶';
+    }
+
+    api.onUpdate(render);
+
+    document.getElementById('prev').addEventListener('click', () => fetchCommand('previous'));
+    playBtn.addEventListener('click', () => fetchCommand('toggle'));
+    document.getElementById('next').addEventListener('click', () => fetchCommand('next'));
+    document.getElementById('close').addEventListener('click', () => api.close());
+    document.getElementById('font').addEventListener('click', () => {
+      fontScale = fontScale >= 8 ? -4 : fontScale + 4;
+      localStorage.setItem('ncm-desktop-font', String(fontScale));
+      if (payload) render(payload);
+    });
+    document.getElementById('lock').addEventListener('click', () => api.lock(true));
+    unlockBtn.addEventListener('click', () => api.lock(false));
+
+    function fetchCommand(action) {
+      api.control(action).catch(() => {});
+    }
+
+    /* Locked windows ignore the mouse entirely; Chromium still forwards
+       mousemove. Hit-test the unlock badge and briefly turn interaction back on
+       only while the pointer is over it, so the rest of the window stays
+       click-through. */
+    window.addEventListener('mousemove', (event) => {
+      if (!locked) {
+        if (interactive) { interactive = false; api.interactive(false); }
+        return;
+      }
+      const rect = unlockBtn.getBoundingClientRect();
+      const inside = event.clientX >= rect.left - 4 && event.clientX <= rect.right + 4
+        && event.clientY >= rect.top - 4 && event.clientY <= rect.bottom + 4;
+      if (inside !== interactive) {
+        interactive = inside;
+        api.interactive(inside);
+      }
+    });
+  </script>
+</body>
+</html>

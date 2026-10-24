@@ -524,3 +524,30 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 ### 版本/发布状态
 - 0.2.3 已装进 `~/.dsh/profiles/desktop/node_modules/ncm-plugin`，需重启 DSH；`ncm-plugin-0.2.3.tgz`（284,434 B）在工作区根。
 - 测试 82/82；GitHub 已通过 REST 同步到 `e85b0c9`（脚本 `%TEMP%\ncm-sync.mjs`，`NODE_OPTIONS=--use-system-ca`）。
+
+## 30. A+B：挂件改壳内 DOM、桌面窗改 Electron（2026-10-25）
+
+用户定案 A+B。两个都换掉，不再修补旧实现。
+
+### A. DSH 内挂件：iframe → 壳内 DOM 组件
+`lib/client.js` 的 `mountLyricsWidget()` 重写：
+- 直接在壳 `document.body` 里建固定层（纯 DOM，无 iframe、无外链 CSS）。**DOM 天然没有文档底色**，透明不需要再跟 browser 的 iframe 背景打架。
+- 文字用 `-webkit-text-shadow` 保证在任意背景上可读；主题跟随 `body[data-ds-dark-theme]`（auto 时深色底给浅色字、浅色底给深色字），也可手动锁定深/浅字。
+- 状态来自 `GET /api/state`（1s 轮询，只在挂件打开时跑），歌词按曲目懒加载 `GET /api/lyric`，当前行用 `reported.position + 距上次上报的时间` 推算。
+- 交互：顶部 22px 拖动条；悬停出控制条（上一首/播放/下一首/设置/锁定/关闭）；点设置展开字号（14–40）、行数（1/3/5）、背景（透明/毛玻璃/卡片）、文字透明度、深/浅字；参数存 `localStorage('ncm-widget-dom')`。
+- 锁定：整层 `pointer-events:none`，点击落到下层页面；只留右上角解锁徽标可点（默认 18% 透明、悬停变亮）。
+- 协议不变：面板/浮空岛仍发 `ncm-open-lyrics`，外壳回 `ncm-widget-mounted`（`mode:'dom'`）。
+
+### B. 桌面窗：PowerShell/WinForms → Electron
+- 新目录 `lib/desktop-lyrics/`：`main.js`（主进程）、`preload.js`、`index.html`、`package.json`（`type:commonjs`，只作用于该目录）。
+- 窗口参数与桌宠一致：`transparent:true`、`frame:false`、`alwaysOnTop:true`（`screen-saver` 层级）、`skipTaskbar:true`、`hasShadow:false`、`resizable:false`、`backgroundColor:'#00000000'`；`setVisibleOnAllWorkspaces`。
+- 歌词由主进程每 400ms 拉 `/api/state`（换曲才拉 `/api/lyric`），**只在内容变化时** `webContents.send` 推给渲染进程；渲染端只改文本节点——不再有 700ms 文件轮询 + GDI 整窗重绘。
+- 穿透：默认 `setIgnoreMouseEvents(true,{forward:true})`；渲染端在锁定态监听转发进来的 `mousemove`，做解锁徽标命中判定，命中时 `setIgnoreMouseEvents(false)`，移开恢复穿透。解锁后整窗可交互（拖动、按钮）。
+- 控制走 IPC（`ncm:control` → 主进程 POST `/api/control`），避免渲染进程跨源 fetch。
+- 运行时复用桌宠装的 `$DSH_HOME/electron`（本机 v43.3.0），插件不额外下载；`NCM_ELECTRON` 可覆盖；找不到 Electron 自动回退 WinForms（`NCM_DESKTOP_ENGINE=winforms` 强制）。
+- **坑**：DSH 宿主进程带 `ELECTRON_RUN_AS_NODE=1`，直接继承会让 Electron 变成普通 Node、窗口起不来；启动器现在显式剥掉这个变量（以及 `ELECTRON_NO_ATTACH_CONSOLE`）。
+
+### 验证
+- DOM 挂件（harness 载入真实 client.js，file:// + 渐变背景）：`background-color: rgba(0,0,0,0)`，无白色方块；悬停控制条正常；点锁定 → `pointer-events:none`、解锁徽标出现；点徽标恢复。截图 `design/shots/mvp/widget-dom-transparent.png`。
+- 桌面窗（真实桌面 2880×1800、200% 缩放）：桌面截图里 5 行歌词透明浮在 DSH 窗口上，无黑框；`engine:'electron'`；空闲 6 秒 CPU 0ms、内存约 135MB。截图 `design/shots/mvp/desktop-lyrics-electron.png`。
+- `node --check lib/desktop-lyrics.js lib/client.js` 通过；测试仍 82/82（这两处是浏览器/窗口侧，未加 node 单测）。
