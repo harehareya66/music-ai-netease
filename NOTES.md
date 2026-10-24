@@ -478,3 +478,9 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - **锁定的真实效果**：挂件锁定后 iframe `pointer-events:none`，鼠标事件直接落到底下的面板上；壳另外在右上角保留一个解锁按钮（因为它不在被穿透的 iframe 里）。这条是「页面级穿透」，不是操作系统级：真正的桌面置顶/穿透要宿主窗口 API（`setIgnoreMouseEvents` + 置顶），插件拿不到。
 - 验证：本地 harness（`%TEMP%\ncm-shell-harness.html`，花底模拟桌面）+ CDP：透明状态背景完全透出；悬停只出控制条；点锁后 `pointer-events:none`、外壳解锁徽标出现；点徽标恢复。截图 `design/shots/mvp/widget-transparent.png`、`widget-hover-chrome.png`、`widget-locked.png`。
 - 测试 **82/82**（新增挂件协议断言：`ncm-widget-lock/close/unlock`、`data-locked`）。
+
+### 28.1 壳级挂件的真实代码验证（不是只画个图）
+- 为了能测 `client.js` 里的 `mountLyricsWidget()`，把 `exports.mountLyricsWidget` 也导出了（壳实际不用，但测试台可以直接调）。
+- `%TEMP%\ncm-client-harness.html`：stub `window.__ModuleLoader__.load` 捕获 factory，用极简 React stub 执行**真实的** `lib/client.js`，再 `mountLyricsWidget().open(absoluteUrl)`；花底模拟其他面板。
+- CDP 结果：挂载成功、拖动后位置变化、子页点锁 → 壳把 iframe 设成 `pointer-events:none` 并显示解锁徽标（`locked=1`）、点徽标恢复、子页点 × → 壳移除节点。截图 `design/shots/mvp/widget-transparent.png`、`widget-hover-chrome.png`、`widget-locked.png` 就是这次跑出来的。
+- 说明：文件协议下 `localStorage` 不可写（位置记忆在 DSH 的 http 源下才生效），测试台忽略这一项；关闭音乐面板后挂件仍在，这一点只能在真实 DSH 里验（重启后）。
