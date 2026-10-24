@@ -507,3 +507,20 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 ### 已知限制
 - 桌面窗只支持 Windows（WinForms）；macOS/Linux 需要另写（DSH 内部挂件跨平台）。
 - 锁定时文本像素仍会挡住点击（只有透明区穿透）；若要连文字也穿透，需要整窗 `WS_EX_TRANSPARENT`，但那样就无法双击解锁，故保留文字可点。
+
+## 29. 2026-10-24 收尾：悬浮歌词遗留与桌宠参考
+
+用户反馈（当天最后一条）：DSH 内挂件仍然白底不透明；Windows 桌面窗太卡。要求参考 `dsh-pet` 的实现。
+
+### 已查到的桌宠实现（可作为改造模板）
+`~/.dsh/profiles/desktop/node_modules/dsh-pet`（v0.3.8）：
+- DSH 内：`lib/client.js` 是 React 组件直接注入壳的 slot（不是 iframe），样式用内联 CSS、`pointer-events` 控制命中区 —— 天然没有文档白底。
+- 桌面：自带 Electron helper（`runtime/electron-helper/main.js`），`new BrowserWindow({ transparent:true, frame:false, alwaysOnTop:true, skipTaskbar:true, hasShadow:false, enableLargerThanScreen:true })`；`setAlwaysOnTop(true, level)` + `setVisibleOnAllWorkspaces`；**默认整窗点击穿透** `setIgnoreMouseEvents(true,{forward:true})`，渲染端在光标进出身体命中区时 IPC 回来翻转；`topmost-watchdog.js` 定期重新置顶；Electron 由 `scripts/ensure-electron.mjs` 落到 `~/.dsh/electron`（本机已存在 v43.3.0 / electron.exe）。
+
+### 当前实现的两个根因（已定位，未改）
+1. **白底**：DSH 内挂件是壳里 `iframe`，`lyric-window?embed=1` 页面自身透明不够，iframe 文档/主题层给了底色；正解是不用 iframe，直接在壳里渲染 DOM。
+2. **桌面卡**：WinForms + `TransparencyKey` 整窗重绘 + 700ms 文件轮询（`desktop-lyrics.content.json`），GDI 透明窗口本身开销就大；正解是 Electron 透明窗 + 事件推送 + 命中反转穿透。
+
+### 版本/发布状态
+- 0.2.3 已装进 `~/.dsh/profiles/desktop/node_modules/ncm-plugin`，需重启 DSH；`ncm-plugin-0.2.3.tgz`（284,434 B）在工作区根。
+- 测试 82/82；GitHub 已通过 REST 同步到 `e85b0c9`（脚本 `%TEMP%\ncm-sync.mjs`，`NODE_OPTIONS=--use-system-ca`）。
