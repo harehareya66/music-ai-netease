@@ -70,6 +70,23 @@
   .head-wrap input{ flex:1 1 auto; min-width:0; height:30px; padding:0 10px; border-radius:8px; border:1px solid #2e3440; background:rgba(15,17,21,.72); color:var(--text); font:inherit; font-size:13px; outline:none; }
   .head-wrap input:focus{ border-color:rgba(229,72,77,.55); }
   .head-wrap .btn.tiny{ flex:0 0 auto; height:28px; padding:0 9px; font-size:12px; }
+  .req-wrap{ margin:12px 20px 0; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.03); }
+  .rw-top{ display:flex; align-items:baseline; gap:10px; }
+  .req-wrap .hw-lab{ color:var(--muted); font-size:12px; white-space:nowrap; }
+  .rw-tip{ color:#5F6570; font-size:11px; line-height:1.5; }
+  .req-wrap textarea{
+    display:block; width:100%; box-sizing:border-box; margin-top:8px; min-height:52px; max-height:120px;
+    padding:8px 10px; border-radius:9px; border:1px solid #2e3440; background:rgba(15,17,21,.55);
+    color:var(--text); font-family:inherit; font-size:12.5px; line-height:1.7; resize:vertical; outline:none;
+  }
+  .req-wrap textarea:focus{ border-color:rgba(229,72,77,.5); }
+  .req-wrap textarea::placeholder{ color:#5F6570; }
+  .req-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .req-chip{
+    height:24px; padding:0 9px; border-radius:999px; border:1px solid #2e3440; background:transparent;
+    color:var(--muted); font-family:inherit; font-size:11px; cursor:pointer;
+  }
+  .req-chip:hover{ color:var(--text); border-color:rgba(229,72,77,.42); }
   .analysis{ margin:12px 20px 0; padding:10px 12px; border:1px dashed rgba(139,144,154,.35); border-radius:10px; background:rgba(255,255,255,.02); }
   .analysis[hidden]{ display:none; }
   .analysis .an-lab{ color:var(--muted); font-size:11.5px; letter-spacing:.04em; margin-bottom:6px; }
@@ -195,6 +212,19 @@
           <span class="hw-lab">藏头的话</span>
           <input id="headText" type="text" maxlength="24" autocomplete="off" placeholder="默认取选中行的首字，可改">
           <button class="btn tiny" type="button" id="headFromSel">用选中行首字</button>
+        </div>
+        <div class="req-wrap">
+          <div class="rw-top">
+            <span class="hw-lab">生成要求</span>
+            <span class="rw-tip">可空。写清楚「要什么」，比反复重生成有用。</span>
+          </div>
+          <textarea id="reqText" rows="2" maxlength="200" placeholder="例：更口语化，保留「雨」和「灯」；或：押韵、每行不超过 12 字；翻译要保留原句顺序"></textarea>
+          <div class="req-chips">
+            <button class="req-chip" type="button" data-req="更口语化，去掉书面腔">更口语</button>
+            <button class="req-chip" type="button" data-req="押韵，句子短一点">押韵</button>
+            <button class="req-chip" type="button" data-req="保留原词里的关键意象，只换说法">保留意象</button>
+            <button class="req-chip" type="button" data-req="写得更克制，不要抒情过度">更克制</button>
+          </div>
         </div>
         <div class="analysis" id="analysisBox" hidden>
           <div class="an-lab">AI 怎么读这段</div>
@@ -398,7 +428,6 @@
     state.selection = null;
     state.anchor = null;
     state.lastCur = -1;
-    var autoRemix = false;
     try {
       var qs = new URLSearchParams();
       qs.set('id', String(id));
@@ -418,8 +447,7 @@
       renderLyrics();
       renderSelectionUI();
       if (state.lines.length) {
-        renderRemixPlaceholder('还没有生成结果', '点下方「开始改写」，让模型把这首词换个写法。');
-        autoRemix = true;
+        renderRemixPlaceholder('先选一种写法，再点「生成」', '上面选「改写成诗 / 翻译 / 藏头 / 短视频文案」，需要的话写一句要求，然后点右下角「生成」。');
         setRemixButtons(true);
       } else {
         renderRemixPlaceholder('这首歌没有可用的歌词', '换一首带歌词的歌再看，或者回面板换一首。');
@@ -436,8 +464,6 @@
       state.loadingLyrics = false;
       updateScopeChips();
     }
-    /* loadingLyrics 已复位后再触发，否则会被 requestRemix 的并发守卫挡掉 */
-    if (autoRemix) requestRemix({ scope: state.scope === 'selection' ? 'selection' : 'all' });
   }
 
   function renderTrackHead(){
@@ -540,7 +566,7 @@
   function syncRegenerate(){
     var btn = $('#regenerate');
     if (!btn) return;
-    btn.textContent = state.remix ? '重新生成' : '开始改写';
+    btn.textContent = state.remix ? '重新生成' : '生成';
     btn.disabled = state.loadingRemix || !state.lines.length;
   }
 
@@ -621,6 +647,9 @@
     if (scope === 'selection' && !(state.selection && state.selection.length)) scope = 'all';
     var body = { id: state.id, mode: state.mode, scope: scope };
     if (scope === 'selection') body.indexes = state.selection.slice();
+    var reqBox = $('#reqText');
+    var extra = reqBox ? String(reqBox.value || '').trim() : '';
+    if (extra) body.extra = extra.slice(0, 200);
     if (state.mode === '藏头') {
       var hidden = String(($('#headText') && $('#headText').value) || state.head || '').trim();
       if (!hidden) { toast('藏头要先选几行歌词，或者写一句想藏进去的话'); return; }
@@ -769,28 +798,22 @@
 
   function switchMode(mode){
     if (state.loadingRemix || state.loadingLyrics) return;
-    // 同一个模式再点一次：如果已经选了行，就按选中重跑（否则用户选完点模式按钮没反应）。
-    if (state.mode === mode && !(state.selection && state.selection.length)) return;
     state.mode = mode;
     updateModeChips();
-    if (!state.lines.length) {
-      $('#remixTitle').textContent = MODE_LABEL[mode] || '改写';
-      $('#remixHint').textContent = MODE_HINT[mode] || '';
-      return;
+    if (mode === '藏头') syncHeadInput();
+    $('#remixTitle').textContent = MODE_LABEL[mode] || '改写';
+    $('#remixHint').className = 'hint';
+    $('#remixHint').textContent = MODE_HINT[mode] || '';
+    /* 只选写法，不自动生成：先让用户看清选项、写要求、确认范围，再点生成。 */
+    if (!state.remix) {
+      var need = mode === '藏头' && !(state.selection && state.selection.length) && !($('#headText') && $('#headText').value.trim());
+      renderRemixPlaceholder(
+        '已选「' + (MODE_LABEL[mode] || '改写') + '」',
+        need ? '藏头默认取选中行的首字：先在左边点几行，或者在上面写一句想藏进去的话。' : '需要的话在「生成要求」里写一句，再点右下角「生成」。'
+      );
     }
-    if (mode === '藏头') {
-      syncHeadInput();
-      if (!state.selection || !state.selection.length) {
-        /* 藏头默认从选中歌词的首字来；没有选中就先让用户选，而不是先让他打字 */
-        state.remix = null;
-        renderRemixPlaceholder('藏头要先选几行歌词', '在左边点几行（Shift 连选），首字会自动变成藏头；也可以自己改上面的那句话。');
-        return;
-      }
-      requestRemix({ scope: 'selection' });
-      return;
-    }
-    // 选了行就按选中的来：这是用户最直接的意图，不该因为点了模式按钮退回整首。
-    requestRemix({ scope: (state.selection && state.selection.length) ? 'selection' : currentScope() });
+    syncRegenerate();
+    syncHeadInput();
   }
 
   /* ---------- current line ---------- */
@@ -980,6 +1003,14 @@
       if (state.loadingLyrics || state.loadingRemix) return;
       if (state.lines.length) requestRemix({ scope: currentScope() });
       else if (state.id) loadLyrics(state.id);
+    });
+    var reqChips = document.querySelectorAll('.req-chip');
+    for (var i = 0; i < reqChips.length; i++) reqChips[i].addEventListener('click', function(){
+      var box = $('#reqText');
+      if (!box) return;
+      var text = this.getAttribute('data-req') || '';
+      box.value = box.value.trim() ? (box.value.trim() + '；' + text) : text;
+      box.focus();
     });
     $('#regenerate').addEventListener('click', function(){
       requestRemix({ scope: currentScope() });

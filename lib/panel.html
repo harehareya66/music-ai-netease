@@ -1836,28 +1836,73 @@
         if (!popup) openLyricsOverlay(url);
       }
 
+      /**
+       * 页内浮层兜底：Environment 不支持 PiP/弹窗时用。
+       * 拖动由父页面接管；锁定后 iframe 不接收指针事件，点击直接落到下面的页面，
+       * 这就是浏览器里能做到的「不挡桌面操作」。
+       */
       function openLyricsOverlay(url) {
         const old = document.getElementById('lyrics-overlay');
         if (old) { old.remove(); return; }
         const box = document.createElement('div');
         box.id = 'lyrics-overlay';
-        box.style.cssText = 'position:fixed;right:18px;bottom:96px;width:360px;height:210px;z-index:60;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0b0d10;box-shadow:0 18px 48px rgba(0,0,0,.55)';
-        const head = document.createElement('div');
-        head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px';
-        head.textContent = '悬浮歌词';
-        const close = document.createElement('button');
-        close.type = 'button';
-        close.textContent = '关闭';
-        close.style.cssText = 'background:none;border:0;color:var(--muted);font:inherit;cursor:pointer';
-        close.onclick = () => box.remove();
-        head.appendChild(close);
+        box.style.cssText = 'position:fixed;right:18px;bottom:96px;width:380px;height:230px;z-index:60;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:transparent;box-shadow:0 18px 48px rgba(0,0,0,.5)';
         const frame = document.createElement('iframe');
         frame.src = url;
-        frame.style.cssText = 'width:100%;height:calc(100% - 25px);border:0;display:block';
+        frame.style.cssText = 'width:100%;height:100%;border:0;display:block;background:transparent';
         frame.title = '悬浮歌词';
-        box.appendChild(head);
+        const grab = document.createElement('div');
+        grab.title = '拖动浮层';
+        grab.style.cssText = 'position:absolute;left:0;right:56px;top:0;height:24px;cursor:grab;z-index:2';
+        const lock = document.createElement('button');
+        lock.type = 'button';
+        lock.textContent = '锁定';
+        lock.title = '锁定后点击穿透到页面；再点一次解锁';
+        lock.style.cssText = 'position:absolute;right:6px;top:5px;z-index:3;height:22px;padding:0 8px;font:11px inherit;border-radius:6px;border:1px solid var(--line);background:rgba(12,14,18,.8);color:var(--muted);cursor:pointer';
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = '×';
+        close.title = '关闭浮层';
+        close.style.cssText = 'position:absolute;right:40px;top:5px;z-index:3;width:22px;height:22px;border-radius:6px;border:1px solid var(--line);background:rgba(12,14,18,.8);color:var(--muted);cursor:pointer';
+        close.onclick = () => box.remove();
+        let locked = false;
+        const setLocked = (next) => {
+          locked = next;
+          frame.style.pointerEvents = locked ? 'none' : 'auto';
+          grab.style.pointerEvents = locked ? 'none' : 'auto';
+          lock.textContent = locked ? '已锁定' : '锁定';
+          lock.style.color = locked ? 'var(--accent)' : 'var(--muted)';
+          box.style.boxShadow = locked ? 'none' : '0 18px 48px rgba(0,0,0,.5)';
+        };
+        lock.onclick = () => setLocked(!locked);
+        window.addEventListener('message', (event) => {
+          const data = event.data || {};
+          if (data && data.type === 'ncm-widget-lock' && event.source === frame.contentWindow) setLocked(Boolean(data.locked));
+        });
+        let drag = null;
+        grab.addEventListener('pointerdown', (event) => {
+          drag = { x: event.clientX, y: event.clientY, left: box.offsetLeft, top: box.offsetTop };
+          grab.setPointerCapture?.(event.pointerId);
+          grab.style.cursor = 'grabbing';
+        });
+        grab.addEventListener('pointermove', (event) => {
+          if (!drag) return;
+          const left = Math.max(0, Math.min(window.innerWidth - 80, drag.left + event.clientX - drag.x));
+          const top = Math.max(0, Math.min(window.innerHeight - 60, drag.top + event.clientY - drag.y));
+          box.style.left = left + 'px';
+          box.style.top = top + 'px';
+          box.style.right = 'auto';
+          box.style.bottom = 'auto';
+        });
+        grab.addEventListener('pointerup', () => { drag = null; grab.style.cursor = 'grab'; });
         box.appendChild(frame);
+        box.appendChild(grab);
+        box.appendChild(lock);
+        box.appendChild(close);
         document.body.appendChild(box);
+        frame.addEventListener('load', () => {
+          try { if (window.__NCM_THEME_TOKENS__) frame.contentWindow.postMessage({ type: 'ncm-theme', tokens: window.__NCM_THEME_TOKENS__ }, '*'); } catch (e) {}
+        });
       }
 
       $('lyrics-float').onclick = openLyricsFloat;

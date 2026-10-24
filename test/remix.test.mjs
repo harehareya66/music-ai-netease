@@ -107,3 +107,24 @@ test('buildRemixPrompt 翻译模式要求英文输出', () => {
   });
   assert.match(prompt, /英文/);
 });
+
+test('buildRemixPrompt: 用户要求与重试修正分开注入', () => {
+  const base = {
+    mode: '改诗',
+    track: { name: '虚拟', artists: ['陈粒'] },
+    selectedText: '固执押韵的排比',
+    fullText: '固执押韵的排比',
+    lineCount: 1,
+  };
+  const withReq = buildRemixPrompt({ ...base, extra: '更口语化，保留「固执」' });
+  assert.match(withReq, /【用户这次的要求，务必满足】更口语化，保留「固执」/);
+  assert.doesNotMatch(withReq, /【上一版的问题/);
+
+  const withFix = buildRemixPrompt({ ...base, fix: '重试：多用原词' });
+  assert.match(withFix, /【上一版的问题，务必修正】重试：多用原词/);
+  assert.doesNotMatch(withFix, /【用户这次的要求/);
+
+  const both = buildRemixPrompt({ ...base, extra: '更短', fix: '重合度太低' });
+  assert.match(both, /【用户这次的要求，务必满足】更短/);
+  assert.match(both, /【上一版的问题，务必修正】重合度太低/);
+});
