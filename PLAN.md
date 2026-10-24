@@ -294,13 +294,17 @@ music-plugin/                     # 仓库根目录（代码与文档同仓，�
 | `GET /music/api/library` | 曲库：账号歌单分组 + 最近播放 + 每日推荐（未登录 401 `NO_ACCOUNT`） |
 | `GET /music/api/taste?range=` | 画像数据 |
 | `GET /music/api/report?week=` | 周报数据 |
+| `GET /music/api/settings` | 读取设置（模型/音质/上报/外观/写歌单状态/数据目录） |
+| `POST /music/api/settings` | 保存设置（校验不合法项，返回 issues） |
+| `GET /music/api/security` | 安全审计报告（文件/出网/静态检查） |
+| `POST /music/api/settings/model-test` | 用选定 provider/model 发一句测试，回 ok/文本/错误 |
 | `GET /music/api/lyric?id=&mode=` | 原词 + 二创（流式见 6.4） |
 | `POST /music/api/scene` | 生成草稿 |
 | `POST /music/api/scene/save` | 落库（写接口未验证时返回 501） |
 | `POST /music/api/queue/*` | 队列动作（沿用） |
 | `POST /music/api/player` | 音量/静音/音质档（写 `session.player`，页面底栏与详情页共用） |
 
-页面路由：`/music/panel`（面板 slot 整页）、`/music/library`、`/music/taste`、`/music/weekly`、`/music/scene`、`/music/lyric`（后五个各自独立 HTML，面板只提供入口链接）。
+页面路由：`/music/panel`（面板 slot 整页）、`/music/library`、`/music/taste`、`/music/weekly`、`/music/scene`、`/music/lyric`、`/music/settings`（后六个各自独立 HTML，面板只提供入口链接）。
 
 ### 6.3 配置面（`cordis.patch.yml`，保留原样，只改注释语言）
 
@@ -321,6 +325,28 @@ music-plugin/                     # 仓库根目录（代码与文档同仓，�
 | `/api/playlist/create` | 建歌单 | ✅ **M0 已验证可用**（`--write` 实测 code 200） |
 | `/api/playlist/manipulate/tracks` | 加/删曲目 | ✅ **M0 已验证可用**（加曲 code 200；删歌单用 `/weapi/playlist/remove`） |
 | `/weapi/feedback/weblog` | 播放上报 | ✅（参考已实现） |
+
+### 6.5 P0 技术定案（2026-10-23，六块优化开工前预验）
+
+三件事先定下来，后面的 P1-P8 按这个口径写，不再回头改。
+
+**① 桌面悬浮歌词（Document Picture-in-Picture）**
+- 事实：壳是 Electron 44.7.0 / Chromium 152.0.7977.130 / Node 24.21.0（`ELECTRON_RUN_AS_NODE=1` 读到）；本机 Edge 155。`documentPictureInPicture` 从 Chromium 116 起有，API 在。
+- 风险：Electron 是否真的给 PiP 开原生窗口，只有渲染进程里调一次才知道；headless Edge 不能当证据。
+- 定案：P5 第一步在**歌词页真实按钮的点击里**做 10 行特性探测（`'documentPictureInPicture' in window` + `requestWindow()` 的 reject 原因），结果落 NOTES；可用就走 PiP，不可用降到 `window.open` 的独立小窗（可拖动、非置顶），再不可用就退回页内浮层。三种降级都不改播放内核。
+
+**② 主题/字体跟随 DSH**
+- 事实：`@deepseek-ai/dsh-client-ui-theme` 通过 **`ctx.theme`** 提供快照（`preference` light/dark/system、resolved、`fontSizes`/`fontFamilies`、`revision`），变化发 `theme/change`；页面侧公开令牌是 `--dsw-*`。
+- 约束：面板与五个独立页都是插件 HTTP 服务提供的**跨源 iframe**，读不到父页 CSS 变量。
+- 定案：`lib/client.js` 注入 `theme`，把快照压成 8 个值（背景/卡片/描边/文字/次要文字/主色/圆角/字号档）拼到页面 URL（`?theme=`）并在 `theme/change` 时向 iframe `postMessage`；页面首屏读 query、后续听 message，统一写 `:root` 变量。**宿主没给就用现有默认色板**，不阻塞。
+- 插件自身的「模板 + 字号」覆盖：存 `session.json` 的 `ui:{template, fontScale}`，页面侧再叠一层，优先于宿主值。
+
+**③ 周报数据口径**
+- 事实：`/weapi/v1/play/record` 用 `type:1` 可以拿到**本周** `weekData` 100 条（每条有 `playCount`、无时间戳，实测首条 14 次）；`type:0` 拿 allData 100 条；上一周没有端点、也没有时间轴。
+- 定案：周报分两栏算，**不混**：
+  - **本周榜单 / 播放次数**：优先账号 `type:1`（若登录），标注「来自网易云本周记录」；
+  - **时长 / 每日分布 / 时段 / 上周对比**：只用本机历史，缺数据时显示「这一栏需要本机播放记录」而不是 0。
+  - 「上周」没有账号来源，只用本机历史；本机没有就整块隐藏，不再显示 2.2 小时这类被 demo 数据污染的数。
 
 ---
 

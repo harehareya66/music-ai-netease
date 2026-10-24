@@ -41,27 +41,77 @@ const logger = {
 };
 
 /**
- * A stand-in LLM for previewing the streaming remix page: answers with a short
- * poem in chunks, so the page can be checked without a provider key.
+ * A stand-in LLM for previewing the streaming remix page **without pretending
+ * to be a writer**: it answers from the text it was given, so two different
+ * selections visibly produce two different results. The first line says it is
+ * fake; real model quality is only checked against a configured provider.
  */
-function makeFakeLlm() {
-  const poem = [
-    '风从西边来的时候，',
-    '你没有把那句话说完。',
-    '夜航的人不看海，',
-    '只看灯一盏一盏地，',
-    '替你把岸边点亮。',
-    '如果明天还有明天，',
-    '我就把今晚折成一只船。',
+function promptText(request) {
+  const content = request?.messages?.at(-1)?.content;
+  return Array.isArray(content)
+    ? content.map((block) => (typeof block === 'string' ? block : block?.text ?? '')).join('')
+    : String(content ?? '');
+}
+
+/** Take the lines inside `【要读的是这一段】` / `【这一次要处理的部分…】` sections. */
+function sectionLines(prompt, marker) {
+  const at = prompt.indexOf(marker);
+  if (at < 0) return [];
+  const rest = prompt.slice(at + marker.length);
+  const stop = rest.search(/\n【/);
+  let body = stop >= 0 ? rest.slice(0, stop) : rest;
+  // 标记行本身的尾巴（「，共 3 行】」）要丢掉，否则会被当成第一行歌词。
+  const close = body.indexOf('】');
+  if (close >= 0 && close < 40) body = body.slice(close + 1);
+  return body
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('【'));
+}
+
+function fakeAnswer(request) {
+  const prompt = promptText(request);
+
+  if (prompt.includes('先只读、不改写')) {
+    const rows = sectionLines(prompt, '【要读的是这一段】');
+    return [
+      '（预览假模型：这段分析也是假的，只为验证两段式管道）',
+      '情绪：克制、怀旧',
+      `意象：${rows.slice(0, 3).map((line) => line.slice(0, 2)).join('、') || '灯、岸、船'}`,
+      `叙事：这 ${rows.length} 行在讲一段没有说完的旧事。`,
+    ];
+  }
+
+  const head = /(?:连起来是"|必须是「)([^"」]+)/.exec(prompt)?.[1] ?? '';
+  const source = sectionLines(prompt, '【这一次要处理的部分');
+  const lyricLines = source.length ? source : sectionLines(prompt, '【整首歌的歌词，只作背景】');
+
+  if (head) {
+    const chars = Array.from(head);
+    // 藏头必须逐行首字对齐，所以不加任何说明行，也不重复已经以该字开头的词。
+    return chars.map((char, index) => {
+      const raw = lyricLines[index] || `第 ${index + 1} 行的词`;
+      const body = raw.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').replace(new RegExp(`^${char}+`), '');
+      return `${char}${body.slice(0, 10)}`;
+    });
+  }
+
+  const shape = '（预览假模型：下面每行都来自你这次选中的歌词，只验证管道）';
+  if (lyricLines.length === 0) return [shape, '这次没有选中任何歌词。'];
+  return [
+    shape,
+    ...lyricLines.slice(0, 7).map((line) => line.replace(/[，。！？；：]$/, '')),
   ];
+}
+
+function makeFakeLlm() {
   return {
     listProviders: () => [{ id: 'preview' }],
     listModels: async () => [{ id: 'preview-model' }],
-    stream: () => (async function* generate() {
-      for (const line of poem) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        yield { type: 'text-delta', text: `${line}
-` };
+    stream: (request) => (async function* generate() {
+      for (const line of fakeAnswer(request)) {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        yield { type: 'text-delta', text: `${line}\n` };
       }
       yield { type: 'finish', reason: { kind: 'stop' } };
     })(),

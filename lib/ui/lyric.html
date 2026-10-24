@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>歌词二创 · 网易云音乐</title>
+<script src="__BASE__/theme.js" defer></script>
 <style>
   :root{
     --bg:#0F1115; --card:#171A20; --card2:#1D2027; --line:#262A33;
@@ -68,6 +69,14 @@
   .head-wrap .hw-lab{ flex:0 0 auto; color:var(--muted); font-size:12px; white-space:nowrap; }
   .head-wrap input{ flex:1 1 auto; min-width:0; height:30px; padding:0 10px; border-radius:8px; border:1px solid #2e3440; background:rgba(15,17,21,.72); color:var(--text); font:inherit; font-size:13px; outline:none; }
   .head-wrap input:focus{ border-color:rgba(229,72,77,.55); }
+  .head-wrap .btn.tiny{ flex:0 0 auto; height:28px; padding:0 9px; font-size:12px; }
+  .analysis{ margin:12px 20px 0; padding:10px 12px; border:1px dashed rgba(139,144,154,.35); border-radius:10px; background:rgba(255,255,255,.02); }
+  .analysis[hidden]{ display:none; }
+  .analysis .an-lab{ color:var(--muted); font-size:11.5px; letter-spacing:.04em; margin-bottom:6px; }
+  .analysis .an-body{ color:#c9ccd3; font-size:13px; line-height:1.75; white-space:pre-wrap; }
+  .meta-line{ margin:10px 20px 0; color:var(--muted); font-size:11.5px; line-height:1.7; }
+  .meta-line[hidden]{ display:none; }
+  .meta-line .warn{ color:#f0a49b; }
   .poem{ padding:18px 20px; font-size:16px; line-height:2.1; color:#DDE1E7; letter-spacing:.4px; flex:1; min-height:0; max-height:62vh; overflow:auto; }
   .poem p{ margin:0 0 2px; }
   .poem p.first{ color:#FF9EA1; }
@@ -184,8 +193,14 @@
         </div>
         <div class="head-wrap" id="headWrap" hidden>
           <span class="hw-lab">藏头的话</span>
-          <input id="headText" type="text" maxlength="24" autocomplete="off" placeholder="每行首字连起来要说的话，例如：秋日私语">
+          <input id="headText" type="text" maxlength="24" autocomplete="off" placeholder="默认取选中行的首字，可改">
+          <button class="btn tiny" type="button" id="headFromSel">用选中行首字</button>
         </div>
+        <div class="analysis" id="analysisBox" hidden>
+          <div class="an-lab">AI 怎么读这段</div>
+          <div class="an-body" id="analysisBody"></div>
+        </div>
+        <div class="meta-line" id="remixMeta" hidden></div>
         <div class="poem" id="remixBody"></div>
         <div class="foot">
           <button class="btn primary" type="button" id="regenerate" disabled>重新生成</button>
@@ -239,6 +254,7 @@
     selection: null,
     anchor: null,
     head: '',
+    headTouched: false,
     scope: 'all',
     mode: '改诗',
     remix: null,
@@ -501,6 +517,7 @@
     return out;
   }
   function renderSelectionUI(){
+    syncHeadInput();
     var rows = $('#lyricBody').querySelectorAll('.line');
     var picked = {};
     var sel = state.selection || [];
@@ -605,9 +622,9 @@
     var body = { id: state.id, mode: state.mode, scope: scope };
     if (scope === 'selection') body.indexes = state.selection.slice();
     if (state.mode === '藏头') {
-      var hidden = String(state.head || '').trim();
-      if (!hidden) { toast('藏头要先写一句想藏进去的话'); return; }
-      body.head = hidden;
+      var hidden = String(($('#headText') && $('#headText').value) || state.head || '').trim();
+      if (!hidden) { toast('藏头要先选几行歌词，或者写一句想藏进去的话'); return; }
+      body.headChars = Array.from(hidden);
     }
     state.remixScope = scope;
     hideError();
@@ -670,10 +687,13 @@
     var badge = $('#remixBadge');
     if (badge) {
       var secs = num(remix.elapsedMs) > 0 ? fmt(num(remix.elapsedMs) / 1000, 1) + 's' : '';
+      var fake = /^preview\//.test(String(remix.route || ''));
       badge.hidden = false;
       badge.title = remix.route ? ('route: ' + remix.route) : '';
-      badge.textContent = 'DSH 模型生成' + (secs ? ' · ' + secs : '');
+      badge.textContent = (fake ? '预览假模型（只验管道）' : 'DSH 模型生成') + (secs ? ' · ' + secs : '');
     }
+    renderAnalysis(remix);
+    renderMeta(remix);
     var lines = String(remix.text || '').split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
     if (!lines.length) lines = [String(remix.text || '')];
     lines.forEach(function(line, i){
@@ -689,7 +709,47 @@
     }
   }
 
+  function renderAnalysis(remix){
+    var box = $('#analysisBox');
+    var body = $('#analysisBody');
+    if (!box || !body) return;
+    var text = remix && remix.analysis ? String(remix.analysis).trim() : '';
+    box.hidden = !text;
+    body.textContent = text;
+  }
+
+  function renderMeta(remix){
+    var box = $('#remixMeta');
+    if (!box) return;
+    box.textContent = '';
+    var parts = [];
+    if (remix && remix.metrics) {
+      parts.push('与原词重合 ' + Math.round(num(remix.metrics.overlap) * 100) + '%（复用 ' + num(remix.metrics.shared) + ' 处）');
+    }
+    if (remix && remix.acrostic && remix.acrostic.wanted && remix.acrostic.wanted.length) {
+      parts.push(remix.acrostic.ok ? '藏头对上了「' + remix.acrostic.wanted.join('') + '」' : '藏头没对上');
+    }
+    if (remix && remix.retried) parts.push('自动重试过 1 次');
+    if (remix && remix.route) parts.push('模型 ' + remix.route);
+    if (remix && remix.sourceLines) parts.push('本次发送 ' + remix.sourceLines + ' 行');
+    var warns = (remix && remix.warnings && remix.warnings.length) ? remix.warnings : [];
+    if (parts.length) {
+      var line = document.createElement('span');
+      line.textContent = parts.join(' · ');
+      box.appendChild(line);
+    }
+    warns.forEach(function(item){
+      var warn = document.createElement('span');
+      warn.className = 'warn';
+      warn.textContent = '　' + item;
+      box.appendChild(warn);
+    });
+    box.hidden = parts.length === 0 && warns.length === 0;
+  }
+
   function renderRemixPlaceholder(title, desc){
+    renderAnalysis(null);
+    renderMeta(null);
     var box = $('#remixBody');
     box.textContent = '';
     var wrap = el('div', 'placeholder');
@@ -709,7 +769,8 @@
 
   function switchMode(mode){
     if (state.loadingRemix || state.loadingLyrics) return;
-    if (state.mode === mode) return;
+    // 同一个模式再点一次：如果已经选了行，就按选中重跑（否则用户选完点模式按钮没反应）。
+    if (state.mode === mode && !(state.selection && state.selection.length)) return;
     state.mode = mode;
     updateModeChips();
     if (!state.lines.length) {
@@ -717,14 +778,19 @@
       $('#remixHint').textContent = MODE_HINT[mode] || '';
       return;
     }
-    if (mode === '藏头' && !String(state.head || '').trim()) {
-      /* 藏头必须先有一句想藏进去的话，等用户填完再生成；旧结果留着会让人误会 */
-      state.remix = null;
-      renderRemixPlaceholder('藏头要先写一句话', '在上面的输入框里写一句想藏进歌词的话，再点「开始改写」。');
-      $('#headText').focus();
+    if (mode === '藏头') {
+      syncHeadInput();
+      if (!state.selection || !state.selection.length) {
+        /* 藏头默认从选中歌词的首字来；没有选中就先让用户选，而不是先让他打字 */
+        state.remix = null;
+        renderRemixPlaceholder('藏头要先选几行歌词', '在左边点几行（Shift 连选），首字会自动变成藏头；也可以自己改上面的那句话。');
+        return;
+      }
+      requestRemix({ scope: 'selection' });
       return;
     }
-    requestRemix({ scope: currentScope() });
+    // 选了行就按选中的来：这是用户最直接的意图，不该因为点了模式按钮退回整首。
+    requestRemix({ scope: (state.selection && state.selection.length) ? 'selection' : currentScope() });
   }
 
   /* ---------- current line ---------- */
@@ -876,13 +942,37 @@
     window.addEventListener('pointerup', function(){ state.drag = null; });
   }
 
+  /* 藏头的默认目标：选中行的首字。用户改了之后就不再覆盖（headTouched）。 */
+  function selectedHeads(){
+    var picked = (state.selection || []).slice().sort(function(a, b){ return a - b; });
+    return picked.map(function(index){
+      var line = state.lines[index] || {};
+      var match = String(line.text || '').trim().match(/[一-龥A-Za-z0-9]/);
+      return match ? match[0] : '';
+    }).join('');
+  }
+
   function syncHeadInput(){
     var wrap = $('#headWrap');
     if (!wrap) return;
     var on = state.mode === '藏头';
     wrap.hidden = !on;
     var input = $('#headText');
-    if (on && input && !input.value) input.value = state.head || '';
+    if (!on || !input) return;
+    if (!state.headTouched) {
+      var derived = selectedHeads();
+      input.value = derived || '';
+      state.head = input.value;
+    } else if (!input.value) {
+      input.value = state.head || '';
+    }
+  }
+
+  function applyHeadsFromSelection(){
+    state.headTouched = false;
+    syncHeadInput();
+    var input = $('#headText');
+    if (input && !input.value.trim()) toast('先选几行歌词，或者自己写一句藏头');
   }
 
   function bind(){
@@ -903,6 +993,12 @@
     $('#copy').addEventListener('click', copyRemix);
     $('#headText').addEventListener('input', function(){
       state.head = $('#headText').value;
+      state.headTouched = true;
+    });
+    var fromSel = $('#headFromSel');
+    if (fromSel) fromSel.addEventListener('click', function(){
+      if (!(state.selection && state.selection.length)) { toast('先选几行歌词'); return; }
+      applyHeadsFromSelection();
     });
     document.querySelector('.bottom').addEventListener('click', function(ev){
       var btn = ev.target.closest('[data-scope]');

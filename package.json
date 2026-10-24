@@ -1,6 +1,6 @@
 {
   "name": "ncm-plugin",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "DSH 的网易云音乐插件：播放器 + AI DJ，外加场景歌单、口味画像、听歌周报、歌词二创。基座 fork 自 @doitian/dsh-music@1.2.0（MIT）。",
   "keywords": [
     "dsh",

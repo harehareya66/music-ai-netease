@@ -223,6 +223,11 @@
       .tab:hover:not(:disabled) { background: none; color: var(--fg); }
       .tab.on { color: var(--fg); border-bottom-color: var(--accent); }
       .lyrics[hidden], .details[hidden], .profile[hidden] { display: none; }
+      .float-btn {
+        margin-left: auto; align-self: center; background: none; border: 1px solid var(--line);
+        border-radius: 999px; padding: 2px 10px; color: var(--muted); font: inherit; font-size: 11.5px;
+      }
+      .float-btn:hover { color: var(--fg); border-color: var(--red); }
       /* The pane is a glance at the current line, not a page: a few lines of
          synced text, scrolled for the rest. `--lyrics-lines` is the single knob. */
       .lyrics {
@@ -405,7 +410,16 @@
       .hint { color: var(--muted); font-size: 12px; text-align: center; }
       .lyrics .hint, .details .hint { text-align: left; margin: 0; }
       .row-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 14px; }
-    </style>
+          .plan details.why { margin-top: 6px; }
+      .plan details.why summary { cursor: pointer; color: var(--muted); font-size: 11.5px; list-style: none; }
+      .plan details.why summary::-webkit-details-marker { display: none; }
+      .plan details.why summary::before { content: '▸ '; }
+      .plan details.why[open] summary::before { content: '▾ '; }
+      .plan details.why ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+      .plan details.why li { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; }
+      .plan details.why li span { color: #c9ccd3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .plan details.why li em { color: var(--muted); font-style: normal; flex: none; }
+</style>
   </head>
   <body>
     <div id="app">
@@ -419,6 +433,7 @@
           <a href="__BASE__/weekly">周报</a>
           <a href="__BASE__/scene">场景</a>
           <a href="__BASE__/lyric">歌词二创</a>
+          <a href="__BASE__/settings">设置</a>
           <a href="__BASE__/dev" class="dev-link" title="制作者检查台：环境、探针结论、功能自检">检查台</a>
         </nav>
         <div class="history" id="history" hidden>
@@ -479,6 +494,7 @@
                 <button id="tab-lyrics" class="tab" type="button" role="tab" data-i18n="lyrics">Lyrics</button>
                 <button id="tab-profile" class="tab" type="button" role="tab" data-i18n="profile">Profile</button>
               </div>
+              <button id="lyrics-float" class="float-btn" type="button" title="单独开一个小窗口显示歌词，可拖动、可关闭">悬浮歌词窗</button>
             </div>
             <div class="details" id="details" role="tabpanel"><p class="hint">—</p></div>
             <div class="lyrics" id="lyrics" role="tabpanel" hidden><p class="hint">—</p></div>
@@ -1365,10 +1381,23 @@
         const djReason = heuristic
           ? '模型没连上，先按相似歌曲、榜单和你的口味兜底'
           : esc(dj.lastPlan?.vibe || '');
+        const reasons = Array.isArray(dj.lastPlan?.reasons) ? dj.lastPlan.reasons : [];
+        const why = reasons.length
+          ? `<details class="why"><summary>为什么是这些歌</summary><ul>${
+              reasons
+                .slice()
+                .reverse()
+                .slice(0, 8)
+                .map((entry) => `<li><span>${esc(entry.name)}</span><em>${esc(entry.reason || '补位候选')}</em></li>`)
+                .join('')
+            }</ul></details>`
+          : '';
         setHtml($('dj-status'), dj.enabled || dj.lastPlan
           ? `<div class="plan">${dj.busy ? esc(t('djPlanning')) : dj.error ? `AI DJ 失败：${esc(dj.error)}` : ''}${
               dj.lastPlan
-                ? `<div><b>+${dj.lastPlan.added}</b> 首 · ${djReason}</div><div class="muted">${esc((dj.lastPlan.names || []).slice(-3).join(' · '))}</div>`
+                ? `<div><b>+${dj.lastPlan.added}</b> 首 · ${djReason}</div>` +
+                  (dj.lastPlan.summary ? `<div class="muted">${esc(dj.lastPlan.summary)}</div>` : '') +
+                  why
                 : ''
             }${heuristic && dj.modelError ? `<div class="muted">想更准：在「AI DJ 模型」里选一个可用模型。</div>` : ''}</div>`
           : '');
@@ -1784,6 +1813,54 @@
       $('tab-details').onclick = () => showInfo('details');
       $('tab-lyrics').onclick = () => showInfo('lyrics');
       $('tab-profile').onclick = () => showInfo('profile');
+      // 悬浮歌词窗：优先进 Document PiP（真正的独立小窗、常在前），
+      // 宿主不给就退到普通弹出窗，再不行退到页内浮层。播放始终不在这里。
+      function openLyricsFloat() {
+        const url = `${BASE}/lyric-window?base=${encodeURIComponent(BASE)}`;
+        const pip = window.documentPictureInPicture;
+        if (pip && typeof pip.requestWindow === 'function') {
+          pip.requestWindow({ width: 560, height: 320 }).then(async (win) => {
+            const html = await fetch(url, { cache: 'no-store' }).then((res) => res.text());
+            const prefix = `<script>window.__NCM_BASE__=${JSON.stringify(BASE)};</scr` + `ipt>`;
+            win.document.open();
+            win.document.write(prefix + html);
+            win.document.close();
+          }).catch(() => openLyricsPopup(url));
+          return;
+        }
+        openLyricsPopup(url);
+      }
+
+      function openLyricsPopup(url) {
+        const popup = window.open(url, 'ncm-lyrics', 'width=560,height=320,menubar=no,toolbar=no,location=no,status=no');
+        if (!popup) openLyricsOverlay(url);
+      }
+
+      function openLyricsOverlay(url) {
+        const old = document.getElementById('lyrics-overlay');
+        if (old) { old.remove(); return; }
+        const box = document.createElement('div');
+        box.id = 'lyrics-overlay';
+        box.style.cssText = 'position:fixed;right:18px;bottom:96px;width:360px;height:210px;z-index:60;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0b0d10;box-shadow:0 18px 48px rgba(0,0,0,.55)';
+        const head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px';
+        head.textContent = '悬浮歌词';
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = '关闭';
+        close.style.cssText = 'background:none;border:0;color:var(--muted);font:inherit;cursor:pointer';
+        close.onclick = () => box.remove();
+        head.appendChild(close);
+        const frame = document.createElement('iframe');
+        frame.src = url;
+        frame.style.cssText = 'width:100%;height:calc(100% - 25px);border:0;display:block';
+        frame.title = '悬浮歌词';
+        box.appendChild(head);
+        box.appendChild(frame);
+        document.body.appendChild(box);
+      }
+
+      $('lyrics-float').onclick = openLyricsFloat;
       paintInfoTabs();
 
       // The introduction's switch, or the written one itself, swaps it with

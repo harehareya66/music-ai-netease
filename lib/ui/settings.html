@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>设置 · 音乐</title>
+<script src="__BASE__/theme.js" defer></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a20;
+    --line: #262a33;
+    --text: #e8eaed;
+    --muted: #8b909a;
+    --red: #e5484d;
+    --teal: #2fb3a6;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 22px 28px 120px;
+  }
+  a { color: inherit; }
+  .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .back {
+    width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line);
+    background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center;
+    text-decoration: none; font-size: 15px;
+  }
+  .back:hover { color: var(--text); border-color: #3a3f4a; }
+  .title { font-size: 15px; font-weight: 650; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .pill {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 16px; }
+  .card h2 { margin: 0 0 2px; font-size: 13px; font-weight: 650; }
+  .card .hint { color: var(--muted); font-size: 11.5px; margin: 0 0 14px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .row + .row { margin-top: 10px; }
+  .label { color: var(--muted); font-size: 12px; min-width: 72px; }
+  .choice { display: flex; flex-direction: column; gap: 8px; }
+  .choice label {
+    display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,.02);
+  }
+  .choice label.on { border-color: rgba(229,72,77,.55); background: rgba(229,72,77,.07); }
+  .choice input {
+    appearance: none; margin-top: 3px; flex: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid var(--muted); background: transparent; cursor: pointer;
+  }
+  .choice input:checked {
+    border-color: var(--red);
+    background: radial-gradient(circle at center, var(--red) 0 4px, transparent 4.4px);
+  }
+  input[type='range'] { accent-color: var(--red); }
+  .choice b { font-weight: 600; }
+  .choice span { color: var(--muted); font-size: 11.5px; }
+  select, input[type="text"], input[type="range"] {
+    background: #101218; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 9px; font: inherit; min-width: 0;
+  }
+  select:disabled { opacity: .45; }
+  select option { background: #191c22; color: #e8eaed; }
+  .btn {
+    background: var(--red); color: #fff; border: 0; border-radius: 9px;
+    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 500; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .mono { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 11.5px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px; font-size: 11px; }
+  .badge.ok { color: #7fd8c9; background: rgba(47,179,166,.13); }
+  .badge.warn { color: #e8c07a; background: rgba(232,192,122,.12); }
+  .badge.bad { color: #f0a0a2; background: rgba(229,72,77,.14); }
+  .msg { font-size: 12px; margin-top: 10px; min-height: 18px; }
+  .msg.ok { color: #7fd8c9; }
+  .msg.bad { color: #f0a0a2; }
+  .toast {
+    position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%) translateY(8px);
+    background: #22262e; border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 14px; font-size: 12px; opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease; z-index: 40;
+  }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .foot { color: var(--muted); font-size: 11px; text-align: center; margin-top: 4px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 1120px) { .cols { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) { body { padding: 16px 16px 140px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="__BASE__/panel" title="回到播放器">‹</a>
+    <div>
+      <div class="title">设置</div>
+      <div class="sub">模型、播放、外观与数据，都在这一页</div>
+    </div>
+    <span class="pill" id="savedPill">读取中…</span>
+  </div>
+
+  <section class="card">
+    <h2>模型</h2>
+    <p class="hint">AI DJ 挑歌和歌词二创都走这里的模型。插件不保存 API Key，Key 只在 DSH「设置 → 模型」里。</p>
+    <div class="choice" id="modelChoices">
+      <label id="choice-follow" class="on">
+        <input type="radio" name="modelMode" value="follow" checked />
+        <span><b>跟随 DSH 当前会话模型</b><br /><span id="agentDefaultText">读取中…</span></span>
+      </label>
+      <label id="choice-pin">
+        <input type="radio" name="modelMode" value="pin" />
+        <span><b>固定用某个模型</b><br /><span>DJ 和二创都用这一条；换 DSH 主题或会话都不受影响</span></span>
+      </label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span class="label">provider</span>
+      <select id="providerSelect" disabled></select>
+      <span class="label" style="min-width:auto">model</span>
+      <select id="modelSelect" disabled></select>
+      <button class="btn ghost" id="testBtn" disabled>测试这个模型</button>
+    </div>
+    <div class="msg" id="modelMsg"></div>
+    <div class="row" style="margin-top:4px">
+      <button class="btn" id="saveBtn">保存设置</button>
+      <span class="hint" style="margin:0" id="effectiveText"></span>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>播放</h2>
+      <p class="hint">音质档和播放上报，等同播放器底栏里的开关。</p>
+      <div class="row">
+        <span class="label">音质</span>
+        <select id="levelSelect">
+          <option value="">跟随配置默认</option>
+          <option value="standard">标准 128</option>
+          <option value="higher">较高 192</option>
+          <option value="exhigh">极高 320</option>
+          <option value="lossless">无损</option>
+          <option value="hires">Hi-Res</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="label">播放上报</span>
+        <select id="scrobbleSelect">
+          <option value="">跟随配置默认</option>
+          <option value="true">开启：计入网易云听歌记录</option>
+          <option value="false">关闭：只听，不上报</option>
+        </select>
+      </div>
+      <p class="hint" style="margin:10px 0 0">关闭上报只影响「写回账号」，本机画像照常记录。</p>
+    </section>
+
+    <section class="card">
+      <h2>外观</h2>
+      <p class="hint">模板默认跟随 DSH；字号只影响插件自己的页面（播放器面板仍跟 DSH）。保存后立即生效。</p>
+      <div class="row">
+        <span class="label">模板</span>
+        <select id="templateSelect">
+          <option value="auto">跟随 DSH</option>
+          <option value="dark">深色</option>
+          <option value="light">浅色</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="label">字号</span>
+        <input type="range" id="fontScale" min="0.85" max="1.3" step="0.05" value="1" style="flex:1" />
+        <span class="mono" id="fontScaleText">100%</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>数据与安全</h2>
+    <p class="hint">账号、cookie、播放历史和模型请求的去向都在「安全与权限」一页；更细的自检在检查台。</p>
+    <dl class="kv">
+      <dt>数据目录</dt><dd class="mono" id="dataDir">—</dd>
+      <dt>写歌单</dt><dd id="writeState">—</dd>
+      <dt>账号</dt><dd id="accountState">—</dd>
+      <dt>更多</dt><dd><a href="__BASE__/security" style="color:var(--red);text-decoration:none">安全与权限 →</a>　<a href="__BASE__/dev" style="color:var(--muted);text-decoration:none">检查台 →</a>　<a href="__BASE__/lyric" style="color:var(--muted);text-decoration:none">歌词二创 →</a></dd>
+    </dl>
+  </section>
+
+  <div class="foot">设置只保存在本机 <span class="mono">session.json</span>；API Key 从不经过这个插件。</div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="__BASE__/mini.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var BASE = '__BASE__';
+  var state = { view: null, mode: 'follow', provider: '', model: '', dirty: false };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function toast(text) {
+    var node = $('toast');
+    node.textContent = text;
+    node.classList.add('on');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(function () { node.classList.remove('on'); }, 2200);
+  }
+  function setMsg(id, text, kind) {
+    var node = $(id);
+    node.textContent = text || '';
+    node.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+  function api(path, options) {
+    return fetch(BASE + '/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}))
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok) {
+            var error = new Error(data.error || ('HTTP ' + res.status));
+            error.code = data.code;
+            throw error;
+          }
+          return data;
+        });
+      });
+  }
+
+  function paintModel() {
+    var view = state.view;
+    if (!view) return;
+    var agent = view.agentDefault;
+    $('agentDefaultText').textContent = agent
+      ? '当前会话：' + agent.provider + ' / ' + agent.model
+      : '宿主没有报告当前会话模型（没有对话时可能为空）';
+    var pinned = view.settings.model && view.settings.model.provider && view.settings.model.model;
+    state.mode = pinned ? 'pin' : 'follow';
+    if (!state.provider) {
+      state.provider = pinned ? view.settings.model.provider : (view.catalog[0] && view.catalog[0].provider) || '';
+    }
+    paintChoices();
+    paintProviderSelect();
+    var effective = view.effective || {};
+    $('effectiveText').textContent = effective.provider
+      ? ('现在实际用：' + effective.provider + ' / ' + effective.model + (effective.source === 'settings' ? '（已固定）' : effective.source === 'agent-default' ? '（跟随会话）' : '（自动发现）'))
+      : (effective.note || '现在没有可用模型');
+  }
+
+  function paintChoices() {
+    $('choice-follow').className = state.mode === 'follow' ? 'on' : '';
+    $('choice-pin').className = state.mode === 'pin' ? 'on' : '';
+    $('choice-follow').querySelector('input').checked = state.mode === 'follow';
+    $('choice-pin').querySelector('input').checked = state.mode === 'pin';
+    var pinned = state.mode === 'pin';
+    $('providerSelect').disabled = !pinned;
+    $('modelSelect').disabled = !pinned;
+    $('testBtn').disabled = !pinned;
+  }
+
+  function paintProviderSelect() {
+    var view = state.view;
+    var providerSelect = $('providerSelect');
+    providerSelect.innerHTML = (view.catalog || []).map(function (entry) {
+      return '<option value="' + esc(entry.provider) + '"' + (entry.provider === state.provider ? ' selected' : '') + '>' + esc(entry.provider) + '</option>';
+    }).join('') || '<option value="">（宿主没有 provider）</option>';
+    paintModelSelect();
+  }
+
+  function paintModelSelect() {
+    var view = state.view;
+    var entry = (view.catalog || []).filter(function (item) { return item.provider === state.provider; })[0];
+    var models = entry ? entry.models : [];
+    if (!state.model || models.indexOf(state.model) === -1) state.model = models[0] || '';
+    $('modelSelect').innerHTML = models.map(function (id) {
+      return '<option value="' + esc(id) + '"' + (id === state.model ? ' selected' : '') + '>' + esc(id) + '</option>';
+    }).join('') || '<option value="">（这个 provider 没有模型）</option>';
+  }
+
+  function paintRest() {
+    var view = state.view;
+    var settings = view.settings;
+    $('levelSelect').value = settings.level || '';
+    $('scrobbleSelect').value = settings.scrobble === null ? '' : String(settings.scrobble);
+    $('templateSelect').value = (settings.ui && settings.ui.template) || 'auto';
+    var scale = (settings.ui && settings.ui.fontScale) || 1;
+    $('fontScale').value = String(scale);
+    $('fontScaleText').textContent = Math.round(scale * 100) + '%';
+    $('dataDir').textContent = view.dataDir || '（未知）';
+    $('writeState').innerHTML = view.write && view.write.playlist
+      ? '<span class="badge ok">已开启</span> 场景页可以把草稿写进你的网易云歌单'
+      : '<span class="badge warn">已关闭</span> 场景页只存本地';
+    $('savedPill').textContent = '已保存';
+  }
+
+  function load() {
+    return api('/settings').then(function (view) {
+      state.view = view;
+      paintModel();
+      paintRest();
+      paintAccount();
+    }).catch(function (error) {
+      $('savedPill').textContent = '读取失败';
+      setMsg('modelMsg', '读取设置失败：' + error.message, 'bad');
+    });
+  }
+
+  function paintAccount() {
+    return api('/state').then(function (data) {
+      var account = data && data.account;
+      $('accountState').innerHTML = data && data.authenticated
+        ? '<span class="badge ok">已登录</span> ' + esc(account && account.nickname ? account.nickname : '')
+        : '<span class="badge warn">未登录</span> 去播放器扫码';
+    }).catch(function () {
+      $('accountState').textContent = '读取失败';
+    });
+  }
+
+  function payload() {
+    var model = state.mode === 'pin'
+      ? { provider: state.provider, model: state.model }
+      : { provider: '', model: '' };
+    var scrobbleValue = $('scrobbleSelect').value;
+    return {
+      model: model,
+      level: $('levelSelect').value,
+      scrobble: scrobbleValue === '' ? null : scrobbleValue === 'true',
+      ui: { template: $('templateSelect').value, fontScale: Number($('fontScale').value) },
+    };
+  }
+
+  function save() {
+    $('saveBtn').disabled = true;
+    api('/settings', { method: 'POST', body: JSON.stringify(payload()) }).then(function (view) {
+      state.view = view;
+      state.provider = view.settings.model.provider || state.provider;
+      state.model = view.settings.model.model || state.model;
+      paintModel();
+      paintRest();
+      setMsg('modelMsg', view.issues && view.issues.length ? ('已保存，但有项被忽略：' + view.issues.join('；')) : '已保存。DJ 和二创从下一次调用起用新设置。', 'ok');
+      toast('设置已保存');
+      // Template and font scale take effect without a reload.
+      if (window.__ncmThemeRefresh) window.__ncmThemeRefresh();
+    }).catch(function (error) {
+      setMsg('modelMsg', '保存失败：' + error.message, 'bad');
+    }).then(function () {
+      $('saveBtn').disabled = false;
+    });
+  }
+
+  function testRoute() {
+    if (state.mode !== 'pin' || !state.provider || !state.model) return;
+    $('testBtn').disabled = true;
+    setMsg('modelMsg', '正在用 ' + state.provider + ' / ' + state.model + ' 试一句…');
+    api('/settings/model-test', {
+      method: 'POST',
+      body: JSON.stringify({ provider: state.provider, model: state.model }),
+    }).then(function (result) {
+      if (result.ok) {
+        setMsg('modelMsg', '通过：模型回了「' + (result.text || '') + '」（' + result.provider + ' / ' + result.model + '）', 'ok');
+      } else {
+        var error = result.error || {};
+        setMsg('modelMsg', '失败：' + (error.code || '') + ' ' + (error.message || ''), 'bad');
+      }
+    }).catch(function (error) {
+      setMsg('modelMsg', '失败：' + error.message, 'bad');
+    }).then(function () {
+      $('testBtn').disabled = false;
+    });
+  }
+
+  $('modelChoices').addEventListener('change', function (event) {
+    if (!event.target.name || event.target.name !== 'modelMode') return;
+    state.mode = event.target.value;
+    paintChoices();
+    setMsg('modelMsg', '');
+  });
+  $('providerSelect').addEventListener('change', function () {
+    state.provider = $('providerSelect').value;
+    state.model = '';
+    paintModelSelect();
+  });
+  $('modelSelect').addEventListener('change', function () { state.model = $('modelSelect').value; });
+  $('fontScale').addEventListener('input', function () {
+    $('fontScaleText').textContent = Math.round(Number($('fontScale').value) * 100) + '%';
+  });
+  $('saveBtn').addEventListener('click', save);
+  $('testBtn').addEventListener('click', testRoute);
+
+  load();
+})();
+</script>
+</body>
+</html>

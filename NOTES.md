@@ -284,3 +284,153 @@ M0 的 V2/V3 已验证 `playlist/create` 与 `playlist/manipulate/tracks` 可用
 3. 运行时加 `NODE_OPTIONS=--use-system-ca`，让 Node 信任系统证书（卡巴斯基根证书）。
 
 仓库：<https://github.com/harehareya66/music-ai-netease>（main）。最近一次同步 commit `d64edbe`，83 个文件。
+
+## 18. P0 预验结论（2026-10-23，六块优化的开工前置）
+
+三件事都验证过，结论写进 `PLAN.md` §6.5，这里存证据。
+
+### ① 壳的版本
+`ELECTRON_RUN_AS_NODE=1 "...\DeepSeek Harness.exe" -e "console.log(process.versions)"`：
+`electron 44.7.0 / chrome 152.0.7977.130 / node 24.21.0`；本机 Edge 155.0.4283.62。
+Document PiP 自 Chromium 116 起支持，API 在；Electron 是否真开原生窗口必须在渲染进程里点一次才能确定，headless Edge 不能当证据 → 留到 P5 首步实测，降级链路已在 PLAN §6.5 写明。
+
+### ② 主题
+`app.asar` 里 `@deepseek-ai/dsh-client-ui-theme` 的 README 明确：feature plugin 用 `ctx.theme` 拿快照（`preference` light/dark/system、resolved、`fontSizes`、`fontFamilies`、`revision`），变化走 `theme/change`；页面侧公开令牌前缀 `--dsw-*`。
+我们的 `lib/client.js` 现在 `inject = ['slots','locale']`，panel 是 `h('iframe',{src:panelUrl()})`，页面由插件 HTTP 服务提供 → **跨源 iframe 读不到父页 CSS 变量**，必须 client 侧读快照、压成 query 参数 + `postMessage`。定案见 PLAN §6.5。
+
+### ③ 周维度（探针 `%TEMP%\ncm-week-probe.mjs`，真实账号 uid 562295789）
+```
+type0+allData=true  => code 200, all 100 首, week 0
+type0+allData=false => code 200, all 100 首, week 0
+type1+allData=true  => code 200, week 100 首, 首条 真夜中のドア 14 次
+type0 only          => code 200, all 100 首, week 0
+/api/v1/play/record?uid=...        => 400 非 JSON
+/api/usertool/play/record?uid=...  => code 404
+```
+结论：**`type:1` 能拿到本周 100 条（带 playCount，无时间戳）**；`type:0` 拿全部累计。上一周没有端点。周报因此分两栏：本周榜单/次数优先账号，时长/每日/时段/上周对比只用本机历史，缺失就隐藏而不是显示 0。
+
+### 实施排期（用户已批，13 人天）
+P0 定案 ✅ → P1 设置与模型底座 2d → P2 二创 v2 2d → P3 AI DJ v2 2d / P4 周报修正 1d（可并行）→ P5 歌词与悬浮窗 2d → P6 安全页与静态检查 1.5d → P7 主题模板 1d → P8 回归发布 1d。
+
+## 19. P1 设置与模型底座（2026-10-23）
+
+### 做了什么
+- **新建 `lib/settings.js`**：`normalizeSettingsPatch()`（模型成对、音质 6 档、scrobble 三态、dj.batchSize 1-20、autoExtendBelow 0-50、ui.template auto/dark/light、fontScale 0.85-1.3；未知键记 issues）、`preferredModel()`（settings → 会话默认模型 → null）、`modelCatalog()`、`effectiveModel()`（再回落 `resolveRoute`）、`testModel()`（发「只回两个字：可以」）。
+- **`lib/session.js`**：settings 增 `model:{provider:'',model:''}`（空 = 跟随会话）与 `ui:{template:'auto',fontScale:1}`；旧的 `djProvider/djModel` 保留为镜像，写 model 时同步。
+- **一条模型路由**：`lib/index.js` 里 AiDj 的 model、`lib/features.js` 的 `remix()` 都改走 `preferredModel()`，不再一个读 `dj.*`、一个读 `config.remix.*`；`config.remix` 只作最后回落。
+- **路由**：`GET/POST /music/api/settings`、`POST /music/api/settings/model-test`、页面 `/music/settings`（`PAGE_NAMES` 加 `settings`）；`#settingsView()` 返回 settings/agentDefault/catalog/catalogError/effective/write/dataDir。
+- **页面 `lib/ui/settings.html`**：四块——模型（跟随 DSH / 固定某模型 + provider/model 联动 select + 测试按钮）、播放（音质 6 档、播放上报 跟随/开/关）、外观（模板 + 字号 85%-130%，P7 接令牌）、数据与安全（dataDir、写歌单、账号、入口链接）；保存走 POST，issues 逐条提示。面板 feature-nav 加「设置」。
+- **测试**：`test/settings.test.mjs` 4 例 + `test/plugin.test.mjs` 设置用例（页面 200、GET 初始形状、POST 持久化与 effective.source、非法 model 400、无 llm 时 model-test ok:false），共 **59/59**；`node scripts/check-panel.mjs` 通过。
+- **preview 实测**：POST `/api/settings` → 200，`effective.source:'settings'`；`/api/settings/model-test` → 200 返回文本；截图 `%TEMP%\settings-page.png`、`settings-1100.png`。
+- 视觉两点：单选按钮改自绘（空心 / 红圈红点），字号 range 用 `accent-color` 跟随主题红；右上角只显示「已保存」。
+
+### 为什么这么做
+P0 定案里「模型两套配置」是二创报「没有可用的模型」的根因；把选择收口到一处后，DJ 与二创共享同一条路由，页面上也能直接看到「现在实际用哪个模型」。
+
+### 踩坑
+- 测试 helper `plugin.call(url, method, body)` 是位置参数，先误传对象导致 404；已改。
+- 带 SSE 的页面不能加 `--virtual-time-budget` 截图（永远不结束），统一用 CDP 脚本截。
+- preview 旧进程会残留占端口，重启前先确认端口释放。
+
+## 20. 侦探：为什么「驴头不对马嘴」+ 假模型自证（2026-10-23）
+
+用户反馈：选中的歌词与输出的诗对不上；无论哪首歌/哪几句/整首，输出都是同一首；藏头不该手输文字。
+
+- **同一首诗的根因**：预览服务器 `scripts/preview.mjs` 的假模型是一段**写死的诗**（`风从西边来的时候…`），完全不看输入。现在改成「按输入回声」：改诗模式逐行回显你这次选中的歌词（最多 7 行），藏头模式用给定的首字逐字生成，第一行明确写「预览假模型：只为验证管道」。同一接口四次调用已能产生四种不同输出。
+- **真实的提示词缺陷**（换真模型也会差）：`lib/features.js:501 buildRemixPrompt()` 只把 `source.text` 塞进一句固定指令，不带歌名/歌手、不带全词上下文、不做任何分析；`lib/core/lyric.js:171 validateRemix()` 只查空/超长/行数/是否中文，查不出「和原词无关」。
+- **藏头设计错位**：把「藏头要藏什么」做成手输框，既不是从选中歌词来，也不校验每行首字是否真的拼出那句话；3 行选中 + 4 字藏头时更没有约束。
+
+## 21. P2 二创 v2：先读再写、可量化、藏头来自选中行（2026-10-23）
+
+用户反馈「选的歌词和输出驴头不对马嘴，所有歌都输出同一首诗，藏头应该是选歌词而不是打字」，核查后三条都成立：
+
+- **同诗**：`scripts/preview.mjs` 的假模型是写死的七行诗，完全无视输入 —— 这解释了预览里「哪首都是它」。已改成回声式假模型（只用于验证管道，首行标明「预览假模型」）。
+- **跑题**：`buildRemixPrompt` 旧版只把选段塞进一句固定指令，没有歌名/整首背景/分析，也没有任何检查。现在分两段：
+  - `buildAnalysisPrompt({track,fullText,selectedText})` → 「情绪 / 意象 / 叙事」三行；
+  - `buildRemixPrompt({mode,track,selectedText,fullText,lineCount,analysis,style,targetChars,extra})` → 带整首作背景、选中行数、analysis、硬约束（行数≈原文、复用原词 ≥3 处、不整句照抄、不写元话语、翻译输出英文）。
+- **可检查**：`lib/core/lyric.js` 新增 `normalizeForCompare` / `bigrams` / `overlapStats(source,answer)` / `extractHeads` / `acrosticReport(answer,targetChars)`。`features.remix()` 返回 `analysis / metrics{overlap,shared,total,echoes} / acrostic{ok,wanted,lines,mismatches} / warnings / retried`；批式路径在 `overlap < MIN_OVERLAP(0.15)` 或藏头错位时带纠正提示重试一次。
+- **藏头**：目标默认取**选中行首字**（`acrosticTarget(headChars, head, selectedLines)`），输入框只是覆盖入口，旁边加「用选中行首字」按钮；`headChars` 由页面传服务端，两个 remix 端点都读。
+- **页面**：右侧加「AI 怎么读这段」卡 + 一行 meta（重合度 / 复用 / 藏头是否对上 / 重试 / 模型 / 发送行数）+ warnings 红字；徽标对 `preview/*` 路由标「预览假模型（只验管道）」。
+- 顺手修：选了行再点模式按钮原先会 early-return 没反应，现在同模式但有选中时按选中重跑。
+
+## 验证
+- `test/remix.test.mjs` 8 例（归一化/双字/重合度、首字、藏头报错、目标来源、两个 prompt 的硬约束）；全部 **68/68**。
+- API：`POST /api/lyric/remix` 两段不同 selection → 文本不同、analysis 不同、metrics `0.44 / 0.56`、`retried:false`；藏头 `targetChars:"零固固"`、`acrostic.ok:true`。
+- CDP（页面）：选第 2/5/8 行（5 行）→ 点「改写成诗」→ `本次发送 5 行`、分析卡「这 5 行…」、meta `与原词重合 68% · 模型 preview/preview-model`；切「藏头」→ 输入框自动填 `零飘你我载`、meta `藏头对上了「零飘你我载」`。截图 `design/shots/mvp/lyric-analysis.png`、`lyric-acrostic.png`。
+
+## 22. P3 AI DJ v2：每批歌说得出为什么，场景可交给 DJ（2026-10-24）
+
+用户原话：「AI DJ 看不出作用、能加歌但不给推荐理由，应该和场景/画像联动」。三处一起改：
+
+- **理由生成**（`lib/dj.js`）：`reasonForPick(track,{topArtists,terms,currentArtists})` 按优先级拼最多三段——boost（你刚说想多听这类 / 尽量避开你不想听的）、口味（你常听 X；没有就「接着 X 听」）、来源标签（`ORIGIN_LABEL`：按你说的搜到 / 你红心过、有一阵没听 / 私人 FM / 和你最近听的歌相似 / 每日推荐 / 新歌速递 / 榜单）、brief 命中（歌名/艺人有「X」）。
+- **批次摘要**：`summarizePicks({tracks,terms,prompt,source,route})` → `{summary,mix}`，例如「按「深夜 emo，别太吵」挑了 5 首：和你最近听的歌相似 3 首、按你说的搜到 2 首；容祖儿 占 3 首；模型没连上，用相似/榜单/口味排序」。
+- **贯通**：`#parseAnswer` 保留模型给的 `why`；`plan()` 统一产出 `tracks(带 reason) / reasons[{id,name,reason}] / summary / mix`，`topUp()`/`start()` 写进 `player.dj.lastPlan`；`/api/dj/test` 也返回 summary 与 reasons。
+- **界面**：面板 DJ 卡多一行 summary + 折叠「▸ 为什么是这些歌」（每条歌名 + 理由，最多 8 条）；`music_dj` 工具的返回与 render 也带 summary 和逐条「— 理由」；`/music/health` 的 dj 段加 `summary`/`reasons`。
+- **场景联动**：场景页草稿工具栏新增「交给 DJ 接着放」（title 提示会替换当前队列）→ `POST /api/dj {enabled:true,start:true,prompt:brief,count:12}`，成功 toast「AI DJ 已接手：按这句场景挑 12 首，去播放器看」，失败页内 errorbar；按钮纳入 `setActionsDisabled`。
+
+## 验证
+- `test/dj-plan.test.mjs` 6 例（理由优先级、来源标签、brief 命中、空输入、出处分布+艺人、无 brief/heuristic 文案）；全部 **74/74**。
+- 预览（假模型 → model tier 降级 heuristic，正好验降级文案）：`POST /api/dj {replan:true}` 后 `summary`「按「深夜 emo，别太吵」挑了 5 首：和你最近听的歌相似 3 首、按你说的搜到 2 首；容祖儿 占 3 首；模型没连上，用相似/榜单/口味排序」、`reasons` 逐条有理由、`mix {similar:3,prompt:2}`；`{start:true,count:12}` 把队列替换成 12 首。
+- CDP：面板点「开始 DJ」→ 摘要行出现、展开折叠看到 5 条「歌名 — 理由」；场景页（深链生成 12 首）点「交给 DJ 接着放」→ toast 出现、队列变成 DJ 的 12 首。截图 `design/shots/mvp/panel-dj-why.png`、`scene-to-dj.png`。
+
+## 23. P4 周报修正：本周榜单走账号，时间维度只认本机（2026-10-24）
+
+按 P0 定案（`PLAN.md` §6.5）落到代码：
+
+- **取数**：`lib/netease.js` 的 `playRecord(uid, {type})` 支持 `type:1`（本周 100 首，带 `playCount`，无时间戳）；新增 `weekRecord(uid)`，返回 `{weekData, code}`，为空回退 `allData`。
+- **合并**：`lib/core/report.js` 新增 `applyAccountWeek(report, account)` —— 账号榜可用时替换 `topTracks`（≤7）、置 `topSource:'account'`、挂 `account{available, weekKey, plays, tracks, source}`；**时长/每日分布/时段/compare 一律不动**（账号没有时间轴）；本机 `plays===0` 且账号榜可用时，`text` 换成「本周本机没有播放记录；账号本周榜显示 N 次播放、M 首（不含时间），榜单在下面。」
+- **选择**：`lib/features.js` 的 `report()` 只在「目标周 = 本周」且账号可用时合并；`accountWeekCache` 10 分钟；`#reportSource()` 给「账号本周记录 + 本机播放历史（榜单来自账号，时长/每日分布来自本机）」。
+- **缓存**：`REPORT_CACHE_VERSION = 3`，老形状的 `session.json` 周报缓存自动作废重算（踩过坑：旧缓存让页面一直显示旧榜/未知艺人）。
+- **页面**（`lib/ui/weekly.html`）：`#topSource` 行写榜单来源；本机 0 播放时四个数字卡显示「—」并各写原因（本机没记录 / 账号不含时间算不出新歌率、跳过率）；单曲循环卡解释「账号记录只有累计次数、没有时间轴」；每日图提示「本机这一周没有播放记录；账号记录不带时间，画不出每日分布」；峰值/常听时段写「本机没有记录 / 需要本机记录」；分享文本带来源。
+- **工具**：`weekly_report` 的返回与描述带榜单来源，账号模式无 loop 时明说原因。
+- 坑与修：`#accountWeek` 曾用 `this.api.normalizeTrack`（模块导出，不是实例方法）→ 账号榜显示「未知艺人/无封面」，改为直接 `normalizeTrack(entry.song)`；CDP 截图默认 500×320，需 `Emulation.setDeviceMetricsOverride {width:1600,height:1150}`，且带 SSE 页面不能用 `--virtual-time-budget`。
+
+## 验证
+- `test/report-account.test.mjs` 4 例（替换榜单保留时间维度、最多 7 条、不可用回退、不改原对象）；全量 **78/78**。
+- 真实账号（uid 562295789）：`GET /api/report?week=this&refresh=1` → `topSource:'account'`、`account{plays:235,tracks:100}`、top1「真夜中のドア〜stay with me」14 次、本机 `metrics{hours:1.2,tracks:28,newTracks:14,skipRate:5.2,plays:55}`、`daily[16,21,25,8,0,0,0]`。
+- 账号-only 数据集（`%TEMP%\ncm-acct`，清空 history）：四卡「—」、循环卡与每日图均为说明文案、榜单来自账号、`text` 为账号口径；上周无账号来源且本机为空 → 整页空态。
+- 截图：`design/shots/mvp/weekly-account.png`、`weekly-account-only.png`。
+
+## 24. P5 悬浮歌词窗（2026-10-24）
+
+用户要「像网易云那样的桌面悬浮歌词窗，可以取消」；P0 定的降级链路：Document PiP → `window.open` 独立小窗 → 页内浮层（三层都不碰播放内核）。
+
+- **新页面** `lib/ui/lyric-window.html`（`/music/lyric-window`，`PAGE_NAMES` 加 `lyric-window`）：上一行 / 当前行（红色）/ 下一行，底部上一首、播放暂停、下一首、歌名艺人、关闭；每秒 800ms 轮询 `/api/state`，按 `reported.position + 距今时长` 推进高亮；歌词只在换歌时拉 `/api/lyric`，并过滤「作词/作曲/原唱…」这类制作人员行（开头无前缀的纯大写人名也掐掉）。
+- **打开方式**：面板「详情/歌词/画像」页签右侧新增「悬浮歌词窗」按钮；浮空岛新增「歌词」按钮（窄屏只留图标）。两者都优先进 `documentPictureInPicture.requestWindow({width:560,height:320})`，把页面 HTML 搬进 PiP 窗口前先注入 `window.__NCM_BASE__`（PiP 的地址是 `about:blank`，页面自己推不出 BASE）；PiP 不可用就 `window.open` 独立窗（带 `?base=`），再被拦就退到面板内 360×210 的浮层 iframe（再点一次关闭）。
+- 关窗不影响播放；窗口里的播放/切歌按钮走 `POST /api/control`，与面板同一份状态。
+- 修过的两个坑：页面读 `data.lines` 应为 `data.lyrics.lines`；PiP 里 `location.pathname` 是 `about:blank` 导致 API 拼成 `/api`，必须注入 BASE。
+
+## 验证
+- `test/plugin.test.mjs` 新增 1 例（`/music/lyric-window` 200、含「歌词」、不含写歌单端点）；全量 **79/79**；`check-panel` 通过（新页面内联脚本语法在检查范围内）。
+- Edge（Chromium 152）CDP 实测：面板点「悬浮歌词窗」与浮空岛点「歌词」都会新增一个 `about:blank` 顶层窗口，页面标题「歌词」，当前行随播放推进（`RYBERG…` 制作人员行已被过滤，播放后当前行变 `And I'll be waiting in the shadow of the sun.`，上一行 `原唱：Max Elto` 之后也过滤）；暂停时粉红色高亮停在当前行。截图 `design/shots/mvp/lyric-window-play.png`、`lyric-window-panel.png`。
+- 待真机：DSH 桌面壳（Electron 44）里 Document PiP 是否允许由壳决定，若不支持会自动落到 `window.open` 小窗；这一条留到 P8 装包后确认。
+
+## 25. P6 安全与权限页 + 源码静态检查（2026-10-24）
+
+用户要求「安全页要说清账号安全，并做静态测试」。这一页分两层：**说清数据流向**（不是文案，是读真实状态）+ **每次打开都重新扫源码**。
+
+- 新建 `lib/security.js`：`auditSource({files})` 四条检查——`no-eval`（无 `eval` / `new Function`）、`outbound-hosts`（源码里的 URL 只允许 `music.163.com` / `interface.music.163.com` / `s.music.163.com` / `*.music.126.net` / 本机回环）、`cookie-not-logged`（日志语句不含 cookie / MUSIC_U）、`no-child-process`（不 spawn 进程）；注释行跳过（图标来源链接曾被误报）。`collectSources(libDir)` 跳过 `vendor/` 与 `node_modules/`；最多缓存 60 秒。
+- `buildSecurityReport({dataDir,settings,write,model,session,now})` 产出：`storage{dataDir,session,cache,probe}`、`account{signedIn,nickname,uid,cookieChars}`、`outbound[]`（网易云 API / 音频 CDN / 模型服务，各带「带走什么」）、`permissions{read/write}`、`model{provider,model,source}`、`checks + checksSummary`。
+- `lib/router.js`：`PAGE_NAMES` 加 `security`，`GET /api/security` 用 `this.api.authenticated/account`（不是 store）；页面 `GET /music/security`。
+- `lib/ui/security.html`（约 330 行）：账号与本机数据（cookie 只显示长度、session 权限、数据目录、模型来源）、数据存在哪里（3 个文件 × 是否出网）、什么会出网（3 行 × 带走什么 × 状态）、插件能做什么 / 不会做什么、源码静态检查（4 条 + 重新检查）、链到设置/检查台/播放器；1100 单列。
+- 设置页「数据与安全」卡加「安全与权限 →」入口。
+- 踩坑：Windows 没有 POSIX 权限位（`chmod` 只切只读），`session.json` 恒 `666` → 报告加 `windows` 标记，文案改「文件在用户目录下，权限位不生效」，`private` 在 Windows 下视为 true；`store.account` 不存在 → 改用 `this.api.authenticated/account`；`security.js` 自己的注释里 `https://lucide.dev` 被当成出网请求 → 跳过注释行。
+
+## 验证
+- `GET /music/api/security`：`checksSummary 4/4 全过`、`signedIn true`、`喝水去喝水`、cookie 937 字符、session 144 KB。
+- 页面 `GET /music/security` 200；1600/1100 两档无横向溢出，检查 4 条全绿。截图 `design/shots/mvp/security.png`、`security-1100.png`。
+- 全量 **80/80**（新增 `/music/security` 200、`/api/security` 结构 4 条检查、报告不含 cookie 值）。
+
+## 26. P7 主题模板与字号（2026-10-24）
+
+设置页外观卡真正生效：模板 auto/dark/light，字号 85%–130%，保存即生效。
+
+- **桥**：`lib/client.js` 新增 `startThemeBridge(ctx)`——读壳上的 `data-ds-dark-theme`（没有就看 `prefers-color-scheme`），变化时（MutationObserver + 5s 轮询去重）`POST /api/theme {resolved}`；插件内存里 `hostTheme` 存着，`GET /api/theme` 返回 `{template, scale, host, effective}`，`effective = template==='auto' ? host||'dark' : template`。
+- **页面**：新增 `lib/ui/theme.js`（路由 `/music/theme.js`），九个页面在 `<title>` 后引它；拿到 `/api/theme` 后给 `<html>` 打 `data-ncm-theme`、`data-ncm-template` 与 `ncm-light`，并 `body.style.zoom = scale`。设置页保存后直接调 `window.__ncmThemeRefresh()`，其它已开标签页在 visibilitychange 时刷新。
+- **浅色怎么做的**：这些页面是按深色手调的颜色（几十处硬编码 hex），只换 CSS 变量会留一半深色 chrome。方案是把内容层整体 `filter: invert(1) hue-rotate(180deg)`，再把 `img/video/canvas` 反向再筛一次（双重反转=原色，封面不变负片），`body` 背景直接给浅色，浮空岛（`.ncm-island`）排除在外保持深色。实测两页（画像/周报/曲库）红仍是红、灰阶仍是灰阶、封面正常。
+- **口径**：播放器面板（基座 `panel.html`）继续跟 DSH 自身的 `data-theme`，不吃这里的模板；字号只作用于插件独立页，避免把基座播放器布局改坏。
+
+## 验证
+- API：`GET /api/theme` 默认 `{template:'auto',effective:'dark'}`；POST `{resolved:'light'}` 后 `host.resolved:'light'、effective:'light'`；设置 `ui.template:'dark'` 后 `effective:'dark'`；`scale:1.2` 透传；非法 resolved → 400。
+- 页面（CDP，1600×950）：`theme:light tmpl:auto zoom:1`（画像页浅色）、`theme:dark tmpl:dark`（强制深色覆盖壳）、`theme:light tmpl:auto zoom:1.2`（周报放大 120%），三例 `scrollWidth===clientWidth` 无横向溢出。截图 `design/shots/mvp/theme-light.png`、`theme-light-scale.png`。
+- 全量 **81/81**（新增主题合并用例）。
