@@ -1833,7 +1833,7 @@
           setTimeout(() => {
             window.removeEventListener('message', onAck);
             if (!settled) openLyricsFallback(url);
-          }, 280);
+          }, 1500);
           return;
         }
         openLyricsFallback(url);

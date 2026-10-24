@@ -10,6 +10,9 @@
       color: #e8eaed;
       user-select: none;
       -webkit-user-select: none;
+      /* Drag the window by grabbing the lyrics themselves; buttons opt out. */
+      -webkit-app-region: drag;
+      app-region: drag;
     }
     #root { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; }
     #drag {
@@ -30,6 +33,16 @@
     #title {
       position: absolute; left: 16px; bottom: 6px; font-size: 11px; opacity: 0;
       transition: opacity 160ms ease; pointer-events: none;
+    }
+    /* Children of a drag region are not draggable by default in Electron —
+       mark the lyric stack explicitly so grabbing the words moves the window. */
+    #root, #lines, #lines div {
+      -webkit-app-region: drag;
+      app-region: drag;
+    }
+    #chrome, #unlock {
+      -webkit-app-region: no-drag;
+      app-region: no-drag;
     }
     #chrome {
       position: absolute; right: 12px; bottom: 6px; display: flex; align-items: center; gap: 2px;

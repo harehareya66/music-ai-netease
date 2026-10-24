@@ -572,3 +572,19 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 ### 两个环境坑
 - Windows PowerShell 5.1 读无 BOM 的 UTF-8 脚本按 ANSI 解析，中文字符串比较（`MainWindowTitle -eq '桌面歌词'`）永远 false；测试脚本要存成 UTF-8 with BOM。
 - `PrintWindow` 在 DPI 虚拟化下截图看起来偏移，容易误判成渲染错位；用 DPI-aware 的 `GetWindowRect` + `CopyFromScreen` 才准。
+
+## 31. 悬浮歌词 0.3.2：命中区、命中反馈、拖动与「两个窗口」（2026-10-24）
+
+用户重启 0.3.0 后反馈：DSH 内挂件是圆角黑卡、按钮点不到、控制条与歌词错位、关不掉、拖不动；桌面端同样拖不动；桌面上像是有两个歌词窗。
+
+- **黑卡**：DOM 挂件把偏好存 `ncm-widget-dom`，其中 `bg:'card'` 是旧版默认 → 升 key 到 `ncm-widget-dom-v2`，旧卡背景不再生效；embed 场景默认 `bg:'none'`。
+- **命中区**：host 是 `pointer-events:auto` 的 560×190 矩形，透明区也吃点击 → 改 `pointer-events:none`，只让拖动条/歌词/控制条/关闭点/解锁徽标可交互；高度按 `行数×字号×1.42+34` 紧凑计算（84–360）；控制条水平居中；新增常驻右上 `closeDot`。
+- **两个窗**：`lib/panel.html` 与 `lib/ui/mini.js` 请求壳挂件后 280ms 无 ack 就回落 PiP；冷启动时壳里 client.js 挂载慢，于是壳挂件与 PiP 同时出现。回退窗口改为 **1500ms**。
+- **桌面拖不动**：Electron 的 app-region 只作用在显式设置的节点，子节点不继承 → `#root/#lines/#lines div` 都设 drag；`#chrome/#unlock` no-drag。主进程未锁定时整窗接受鼠标（原来只认右下 chrome 和顶部 30px），锁定后只认右上 32×32 解锁徽标。
+- **坐标/DPI**：`getBounds()` 是 DIP，`getCursorScreenPoint()` 在 200% 缩放下可能给物理像素 → `toLocal()` 同时尝试 DIP 与「物理/scaleFactor」两种解释，取落在窗口内的那个。
+- **防重复**：Electron 主进程 `requestSingleInstanceLock()`；启动器在 start 前调用 `lib/desktop-lyrics/kill-stale.ps1`（按窗口标题「桌面歌词」清理上一会话残留的 detached 进程）。
+- **快捷键**：`Ctrl+Alt+L` 锁定/解锁、`Ctrl+Alt+X` 关闭。
+
+## 验证
+- DOM 挂件（真实 client.js + file:// harness，CDP 真鼠标）：背景 `rgba(0,0,0,0)`、host `pointer-events:none`、空白处 `elementFromPoint` 落在页面上、拖动 (812,590)→(692,510)、点 `closeDot` 可移除、锁定后整层 `pointer-events:none`。
+- 桌面窗（DPI-aware PowerShell 真鼠标）：从歌词中部拖动 (366,1012)→(441,1052)；点 × 关闭；锁定后同样拖动位置不变（穿透成立）；点右上 🔓 解锁后拖动恢复；连续 start 两次窗口数恒为 1。
