@@ -372,3 +372,21 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - `test/dj-plan.test.mjs` 6 例（理由优先级、来源标签、brief 命中、空输入、出处分布+艺人、无 brief/heuristic 文案）；全部 **74/74**。
 - 预览（假模型 → model tier 降级 heuristic，正好验降级文案）：`POST /api/dj {replan:true}` 后 `summary`「按「深夜 emo，别太吵」挑了 5 首：和你最近听的歌相似 3 首、按你说的搜到 2 首；容祖儿 占 3 首；模型没连上，用相似/榜单/口味排序」、`reasons` 逐条有理由、`mix {similar:3,prompt:2}`；`{start:true,count:12}` 把队列替换成 12 首。
 - CDP：面板点「开始 DJ」→ 摘要行出现、展开折叠看到 5 条「歌名 — 理由」；场景页（深链生成 12 首）点「交给 DJ 接着放」→ toast 出现、队列变成 DJ 的 12 首。截图 `design/shots/mvp/panel-dj-why.png`、`scene-to-dj.png`。
+
+## 23. P4 周报修正：本周榜单走账号，时间维度只认本机（2026-10-24）
+
+按 P0 定案（`PLAN.md` §6.5）落到代码：
+
+- **取数**：`lib/netease.js` 的 `playRecord(uid, {type})` 支持 `type:1`（本周 100 首，带 `playCount`，无时间戳）；新增 `weekRecord(uid)`，返回 `{weekData, code}`，为空回退 `allData`。
+- **合并**：`lib/core/report.js` 新增 `applyAccountWeek(report, account)` —— 账号榜可用时替换 `topTracks`（≤7）、置 `topSource:'account'`、挂 `account{available, weekKey, plays, tracks, source}`；**时长/每日分布/时段/compare 一律不动**（账号没有时间轴）；本机 `plays===0` 且账号榜可用时，`text` 换成「本周本机没有播放记录；账号本周榜显示 N 次播放、M 首（不含时间），榜单在下面。」
+- **选择**：`lib/features.js` 的 `report()` 只在「目标周 = 本周」且账号可用时合并；`accountWeekCache` 10 分钟；`#reportSource()` 给「账号本周记录 + 本机播放历史（榜单来自账号，时长/每日分布来自本机）」。
+- **缓存**：`REPORT_CACHE_VERSION = 3`，老形状的 `session.json` 周报缓存自动作废重算（踩过坑：旧缓存让页面一直显示旧榜/未知艺人）。
+- **页面**（`lib/ui/weekly.html`）：`#topSource` 行写榜单来源；本机 0 播放时四个数字卡显示「—」并各写原因（本机没记录 / 账号不含时间算不出新歌率、跳过率）；单曲循环卡解释「账号记录只有累计次数、没有时间轴」；每日图提示「本机这一周没有播放记录；账号记录不带时间，画不出每日分布」；峰值/常听时段写「本机没有记录 / 需要本机记录」；分享文本带来源。
+- **工具**：`weekly_report` 的返回与描述带榜单来源，账号模式无 loop 时明说原因。
+- 坑与修：`#accountWeek` 曾用 `this.api.normalizeTrack`（模块导出，不是实例方法）→ 账号榜显示「未知艺人/无封面」，改为直接 `normalizeTrack(entry.song)`；CDP 截图默认 500×320，需 `Emulation.setDeviceMetricsOverride {width:1600,height:1150}`，且带 SSE 页面不能用 `--virtual-time-budget`。
+
+## 验证
+- `test/report-account.test.mjs` 4 例（替换榜单保留时间维度、最多 7 条、不可用回退、不改原对象）；全量 **78/78**。
+- 真实账号（uid 562295789）：`GET /api/report?week=this&refresh=1` → `topSource:'account'`、`account{plays:235,tracks:100}`、top1「真夜中のドア〜stay with me」14 次、本机 `metrics{hours:1.2,tracks:28,newTracks:14,skipRate:5.2,plays:55}`、`daily[16,21,25,8,0,0,0]`。
+- 账号-only 数据集（`%TEMP%\ncm-acct`，清空 history）：四卡「—」、循环卡与每日图均为说明文案、榜单来自账号、`text` 为账号口径；上周无账号来源且本机为空 → 整页空态。
+- 截图：`design/shots/mvp/weekly-account.png`、`weekly-account-only.png`。

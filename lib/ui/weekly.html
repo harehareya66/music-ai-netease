@@ -219,6 +219,7 @@
       <section class="card panel" aria-label="本周最爱">
         <div class="phead"><h2>本周最爱</h2><span class="note">TOP 7</span></div>
         <div class="tracks" id="topTracks"></div>
+        <p class="hint" id="topSource" hidden></p>
       </section>
 
       <section class="card panel" aria-label="单曲循环">
@@ -345,7 +346,13 @@
     }
   }
 
+  function accountTopOf(r){
+    return !!(r && r.topSource === 'account' && r.account && r.account.available && r.topTracks && r.topTracks.length);
+  }
+
   function isEmptyReport(r){
+    /* 本机没有记录但账号榜可用时，页面仍有内容可看（账号榜），不能整页空态。 */
+    if (accountTopOf(r)) return false;
     var m = r && r.metrics;
     if (!m) return true;
     return num(m.plays) === 0 && num(m.hours) === 0 && num(m.tracks) === 0;
@@ -365,32 +372,57 @@
     $('#empty').hidden = true;
     $('#content').hidden = false;
 
-    var compare = r.compare || null;
+    var localPlays = Math.round(num(m.plays));
+    var compare = localPlays > 0 ? (r.compare || null) : null;
+    /* 榜单来源：有账号本周记录时用账号的，否则用本机的。 */
+    var topNote = $('#topSource');
+    if (topNote) {
+      var accountTop = accountTopOf(r);
+      topNote.hidden = false;
+      topNote.textContent = accountTop
+        ? '榜单来自账号本周记录（' + Math.round(num(r.account.plays)) + ' 次 · 最近 100 首 · 不含时间）'
+        : '榜单来自本机播放历史';
+    }
 
-    setValue($('#statHours'), fmt(num(m.hours), 1), '小时');
+    var localOnly = localPlays === 0 && accountTop;
+
+    if (localOnly) {
+      setValue($('#statHours'), '—', '小时');
+      $('#deltaHours').textContent = '本机这一周没有记录';
+      setValue($('#statTracks'), '—', '首');
+      $('#deltaTracks').textContent = '本机这一周没有记录';
+      setValue($('#statNew'), '—', '首');
+      $('#deltaNew').textContent = '账号记录不含时间，算不出新歌率';
+      setValue($('#statSkip'), '—', '%');
+      $('#deltaSkip').textContent = '账号记录不含时间，算不出跳过率';
+    }
+
+    if (!localOnly) setValue($('#statHours'), fmt(num(m.hours), 1), '小时');
     var hoursDelta = deltaNode($('#deltaHours'), compare ? compare.hours : null, {
       unit: '小时', digits: 1, goodWhen: 'up', flatText: '与上一周基本持平'
     });
-    if (hoursDelta === 'none') $('#deltaHours').textContent = '上一周还没有数据可对比';
+    if (!localOnly && hoursDelta === 'none') $('#deltaHours').textContent = localPlays > 0 ? '上一周还没有数据可对比' : '本机这一周没有记录';
 
-    setValue($('#statTracks'), String(Math.round(num(m.tracks))), '首');
-    $('#deltaTracks').textContent = '平均每天 ' + fmt(num(m.tracks) / 7, 1) + ' 首';
-    $('#deltaTracks').className = 'd';
+    if (!localOnly) {
+      setValue($('#statTracks'), String(Math.round(num(m.tracks))), '首');
+      $('#deltaTracks').textContent = '平均每天 ' + fmt(num(m.tracks) / 7, 1) + ' 首';
+      $('#deltaTracks').className = 'd';
+    }
 
-    setValue($('#statNew'), String(Math.round(num(m.newTracks))), '首');
+    if (!localOnly) setValue($('#statNew'), String(Math.round(num(m.newTracks))), '首');
     var newDelta = deltaNode($('#deltaNew'), compare ? compare.newTracks : null, {
       unit: '首', digits: 0, goodWhen: 'up', flatText: '与上一周一样多'
     });
-    if (newDelta === 'none') $('#deltaNew').textContent = '上一周还没有数据可对比';
+    if (!localOnly && newDelta === 'none') $('#deltaNew').textContent = localPlays > 0 ? '上一周还没有数据可对比' : '本机这一周没有记录';
 
-    setValue($('#statSkip'), fmt(num(m.skipRate), 1), '%');
+    if (!localOnly) setValue($('#statSkip'), fmt(num(m.skipRate), 1), '%');
     var skipDelta = deltaNode($('#deltaSkip'), compare ? compare.skipRate : null, {
       unit: '%', digits: 1, goodWhen: 'down', flatText: '与上一周持平'
     });
-    if (skipDelta === 'none') $('#deltaSkip').textContent = '上一周还没有数据可对比';
+    if (!localOnly && skipDelta === 'none') $('#deltaSkip').textContent = localPlays > 0 ? '上一周还没有数据可对比' : '本机这一周没有记录';
 
     renderTopTracks(r.topTracks);
-    renderLoop(r.loop);
+    renderLoop(r.loop, r);
     renderText(r.text, r);
     renderDaily(r);
     renderSource(r.dataSource || r.source);
@@ -455,11 +487,14 @@
     });
   }
 
-  function renderLoop(loop){
+  function renderLoop(loop, report){
     var box = $('#loopBox');
     box.textContent = '';
     if (!loop || !loop.track) {
-      box.appendChild(el('div', 'loop-empty', '这一周没有哪首歌被你反复按播放。'));
+      var accountOnly = report && report.topSource === 'account' && report.account && report.account.available;
+      box.appendChild(el('div', 'loop-empty', accountOnly
+        ? '账号记录只有累计次数、没有时间轴，循环故事要等本机播放过才有。'
+        : '这一周没有哪首歌被你反复按播放。'));
       return;
     }
     var top = el('div', 'loop-top');
@@ -544,6 +579,13 @@
     if (!days.length) { chart.appendChild(el('div', 'hint', '没有每日数据。')); return; }
     var max = 0;
     days.forEach(function(d){ max = Math.max(max, num(d.minutes)); });
+    if (max === 0) {
+      chart.appendChild(el('div', 'hint', '本机这一周没有播放记录；账号记录不带时间，画不出每日分布。'));
+      axis.textContent = '';
+      $('#peakNote').textContent = '峰值 本机没有记录';
+      $('#windowNote').textContent = '常听时段 需要本机记录';
+      return;
+    }
     var peakIdx = -1;
     days.forEach(function(d, i){ if (num(d.minutes) === max && max > 0 && peakIdx < 0) peakIdx = i; });
     days.forEach(function(d, i){
@@ -589,6 +631,7 @@
     var lines = [];
     lines.push('《听歌周报》' + (week.label || ''));
     lines.push('听歌 ' + fmt(num(m.hours), 1) + ' 小时 · 曲目 ' + Math.round(num(m.tracks)) + ' 首 · 新歌 ' + Math.round(num(m.newTracks)) + ' 首 · 跳过率 ' + fmt(num(m.skipRate), 1) + '%');
+    if (r.topSource === 'account' && r.account && r.account.available) lines.push('（榜单来自账号本周记录，时长与本机记录）');
     var tops = Array.isArray(r.topTracks) ? r.topTracks.slice(0, 7) : [];
     if (tops.length) {
       lines.push('本周最爱：');
