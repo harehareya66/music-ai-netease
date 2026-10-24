@@ -116,6 +116,7 @@
   }
   .lock-badge:hover { color: var(--text); }
   .lock-note { display: none; position: absolute; left: 10px; bottom: 6px; font-size: 10px; color: var(--dim); }
+  html[data-locked='1'] .widget { background: transparent !important; box-shadow: none !important; }
   html[data-locked='1'] .chrome,
   html[data-locked='1'] .panel {
     opacity: 0 !important; pointer-events: none !important; visibility: hidden;
@@ -179,8 +180,13 @@
   var lyricId = null;
   var lastTrackId = null;
   var lastFetchAt = 0;
-  var prefs = { font: 22, lines: 3, alpha: 100, locked: false, bg: EMBED ? 'none' : 'card' };
-  try { prefs = Object.assign(prefs, JSON.parse(localStorage.getItem('ncm-widget') || '{}')); } catch (e) {}
+  var prefs = { font: 22, lines: 3, alpha: 100, locked: false, bg: EMBED ? 'none' : 'card', bgTouched: false };
+  try {
+    var saved = JSON.parse(localStorage.getItem('ncm-widget') || '{}') || {};
+    prefs = Object.assign(prefs, saved);
+    /* 内嵌挂件默认必须是透明的：旧的 bg 选择（可能是独立窗时代的 card）不能把它变回黑框。 */
+    if (EMBED && !saved.bgTouched) prefs.bg = 'none';
+  } catch (e) {}
 
   function isCapsCredit(text) {
     var t = String(text || '').trim();
@@ -205,7 +211,7 @@
     var root = document.documentElement;
     root.style.setProperty('--font', prefs.font + 'px');
     root.style.setProperty('--alpha', String(prefs.alpha / 100));
-    root.style.setProperty('--surface', surfaceFor(prefs.bg));
+    root.style.setProperty('--surface', prefs.locked ? 'rgba(12, 14, 18, 0)' : surfaceFor(prefs.bg));
     root.dataset.locked = prefs.locked ? '1' : '0';
     root.dataset.bg = prefs.bg;
     document.getElementById('fontVal').textContent = prefs.font + 'px';
@@ -358,6 +364,7 @@
   Array.prototype.forEach.call(document.querySelectorAll('[data-bg]'), function (b) {
     b.addEventListener('click', function () {
       prefs.bg = b.getAttribute('data-bg');
+      prefs.bgTouched = true;
       savePrefs(); applyPrefs();
     });
   });

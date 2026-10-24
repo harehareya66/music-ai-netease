@@ -204,6 +204,15 @@ test('settings page and API agree, and a saved route survives a re-read', async 
     assert.equal(bad.status, 400);
     assert.match(bad.json.error, /provider 和 model/);
 
+    const desk = await plugin.call('/music/api/desktop-lyrics');
+    assert.equal(desk.status, 200);
+    assert.equal(desk.json.ok, true);
+    assert.equal(desk.json.running, false);
+
+    const badDesk = await plugin.call('/music/api/desktop-lyrics', 'POST', { action: 'dance' });
+    assert.equal(badDesk.status, 400);
+    assert.match(badDesk.json.error, /start 或 stop/);
+
     const noModel = await plugin.call('/music/api/settings/model-test', 'POST', { provider: 'p', model: 'm' });
     // Without a host LLM service the test reports a coded failure instead of
     // pretending the route works.
