@@ -551,3 +551,24 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - DOM 挂件（harness 载入真实 client.js，file:// + 渐变背景）：`background-color: rgba(0,0,0,0)`，无白色方块；悬停控制条正常；点锁定 → `pointer-events:none`、解锁徽标出现；点徽标恢复。截图 `design/shots/mvp/widget-dom-transparent.png`。
 - 桌面窗（真实桌面 2880×1800、200% 缩放）：桌面截图里 5 行歌词透明浮在 DSH 窗口上，无黑框；`engine:'electron'`；空闲 6 秒 CPU 0ms、内存约 135MB。截图 `design/shots/mvp/desktop-lyrics-electron.png`。
 - `node --check lib/desktop-lyrics.js lib/client.js` 通过；测试仍 82/82（这两处是浏览器/窗口侧，未加 node 单测）。
+
+## 31. 悬浮歌词的两个交互 bug（2026-10-24）
+
+用户截图反馈：DSH 内挂件按钮点不了、底部体型过大与歌词错位、关不掉、拖不动；桌面窗同样。
+
+### DSH 内挂件（`lib/client.js`）
+- **命中区**：host 自己 `pointer-events:none`，只有真正可见的部件 opt-in。原先整块 560×190 的透明矩形都在吃点击，所以「看起来是空白，点下去却被挂件接住」。
+- **形状贴合内容**：高度按 `行数 × 字号 × 1.42 + 34` 计算（84–360 夹紧），不再固定 190；控制条水平居中，落在歌词下方。
+- **拖动**：顶部原来是一条贯穿整宽的 26px 隐形条（同样吃点击），改成 160×22 的居中握把；歌词区不再接收鼠标，页面点击可正常穿透。
+- **关闭**：新增常驻 `×`（右上，hover 显示），与解锁徽标分开位置；锁定时 `closeDot` 直接 `display:none`——之前它叠在解锁徽标上，锁定后点到的其实是看不见的关闭键，既解不开锁也关不掉。
+- 验证（CDP 真鼠标）：`elementFromPoint` 在空白处返回页面元素而不是挂件；点 `×` 后挂件移除；按住握把拖动 (778,521)→(678,471)。
+
+### 桌面窗（`lib/desktop-lyrics/main.js`）
+- **按钮点不了**：renderer 在未锁定态主动 `interactive(false)`，主进程永远忽略鼠标。现在主进程 60ms 轮询真实光标，用窗口几何自己决定 `setIgnoreMouseEvents`（chrome 右下 190×42、拖动条顶部 30、锁定后仅解锁徽标），renderer 的 `ncm:interactive` 只读兼容。
+- **坐标对不上**：`getBounds()` 是 DIP，`getCursorScreenPoint()` 在部分 Windows 上给物理像素 → 命中永远算到窗外。`toLocal()` 同时按「point 是 DIP」和「point 是物理」两种解释计算，取落在窗口内的那个（scaleFactor 来自 `getDisplayNearestPoint`）。
+- **锁定/解锁**：锁定后只剩右上角 24×24 解锁徽标可点；`Ctrl+Alt+L` 切锁定、`Ctrl+Alt+X` 关窗。
+- 验证（DPI-aware PowerShell 真鼠标）：拖动 (240,1012)→(290,972)；点锁定后点 `×` 不关闭（穿透成立）；点解锁徽标后点 `×` 关闭。
+
+### 两个环境坑
+- Windows PowerShell 5.1 读无 BOM 的 UTF-8 脚本按 ANSI 解析，中文字符串比较（`MainWindowTitle -eq '桌面歌词'`）永远 false；测试脚本要存成 UTF-8 with BOM。
+- `PrintWindow` 在 DPI 虚拟化下截图看起来偏移，容易误判成渲染错位；用 DPI-aware 的 `GetWindowRect` + `CopyFromScreen` 才准。

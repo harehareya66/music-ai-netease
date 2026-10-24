@@ -6,7 +6,8 @@
   [int]$X = -1,
   [int]$Y = -1,
   [string]$StateFile = '',
-  [string]$ContentFile = ''
+  [string]$ContentFile = '',
+  [string]$PosFile = ''
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -156,14 +157,23 @@ public class LyricDesktopWindow : Form
         float sideSize = FontSize * 0.62f;
         float spacing = 8f;
 
-        float total = currentSize + (count - 1) * sideSize + (count - 1) * spacing;
+        int cur = Current;
+        if (cur < 0) cur = 0;
+        if (cur >= count) cur = count - 1;
+
+        /* The chunk is centred on the line being sung, so the big/bold row is at
+           `Current`, not always row 0. Sizes differ per row, so the block has to
+           be measured row by row instead of assuming one big row on top. */
+        float total = 0f;
+        for (int i = 0; i < count; i++) total += (i == cur ? currentSize : sideSize) + spacing;
+        total -= spacing;
         float y = centerY - total / 2f;
 
         StringFormat format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near, Trimming = StringTrimming.EllipsisCharacter };
 
         for (int i = 0; i < count; i++)
         {
-            bool isCurrent = i == 0;
+            bool isCurrent = i == cur;
             float size = isCurrent ? currentSize : sideSize;
             Color color = isCurrent ? Color.FromArgb(229, 72, 77) : Color.FromArgb(185, 188, 195);
             using (Font font = new Font("Microsoft YaHei UI", size / 1.35f, isCurrent ? FontStyle.Bold : FontStyle.Regular))
@@ -249,23 +259,49 @@ if ($StateFile) {
 }
 
 $contentFile = $ContentFile
-while (-not $form.IsDisposed) {
-  # Node 侧已经算好「标题 + 当前 3/5 行」，这里只负责画：PowerShell 不碰 HTTP 和 JSON 编码。
+$script:lastRaw = ''
+$script:lastPoint = ''
+
+# 刷新走 WinForms Timer，而不是「DoEvents + Start-Sleep 400」的老循环：
+# 那个循环会把消息泵按住 400ms，鼠标拖动时窗口每 400ms 才挪一次，手感就是一卡一卡。
+$tick = {
+  if ($form.IsDisposed) { return }
+  # Node 侧已经算好「标题 + 当前 3/5 行 + 高亮行下标」，这里只负责画：PowerShell 不碰 HTTP 和 JSON 编码。
   if ($contentFile -and (Test-Path $contentFile)) {
     try {
       $raw = Get-Content -Path $contentFile -Raw -Encoding UTF8
-      $content = $raw | ConvertFrom-Json
-      $form.Title = [string]$content.title
-      $form.StatusText = [string]$content.status
-      $next = @()
-      if ($content.lines) { $next = @($content.lines | ForEach-Object { [string]$_ }) }
-      if (($next -join "`n") -ne ($form.Lines -join "`n") -or $form.StatusText -ne $script:lastStatus) {
+      if ($raw -ne $script:lastRaw) {
+        $script:lastRaw = $raw
+        $content = $raw | ConvertFrom-Json
+        $form.Title = [string]$content.title
+        $form.StatusText = [string]$content.status
+        $form.Current = [int]$content.current
+        $next = @()
+        if ($content.lines) { $next = @($content.lines | ForEach-Object { [string]$_ }) }
         $form.Lines = $next
-        $script:lastStatus = $form.StatusText
+        if ($form.Current -ge $next.Count) { $form.Current = 0 }
         $form.Invalidate()
       }
     } catch {}
   }
-  [System.Windows.Forms.Application]::DoEvents()
-  Start-Sleep -Milliseconds 400
+  # 拖动结束后把新位置写回，下次启动就能回到原处（Electron 引擎一直这么做）。
+  if ($PosFile) {
+    try {
+      $point = "$($form.Left),$($form.Top)"
+      if ($point -ne $script:lastPoint) {
+        $script:lastPoint = $point
+        Set-Content -Path $PosFile -Value (ConvertTo-Json @{ x = $form.Left; y = $form.Top } -Compress) -Encoding UTF8
+      }
+    } catch {}
+  }
 }
+
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 120
+$timer.Add_Tick($tick)
+$timer.Start()
+$tick.Invoke()
+
+# 真正的消息泵：拖动、重绘、命中测试都交给 WinForms 自己的循环，PowerShell 不再插手。
+[System.Windows.Forms.Application]::Run($form)
+$timer.Stop()
