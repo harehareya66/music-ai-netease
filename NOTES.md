@@ -464,3 +464,17 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - CDP：二创首屏 `body` 为「先选一种写法，再点生成」，选「翻译」后不生成；写要求后点生成，`meta` 显示发送行数；服务端 prompt 含「【用户这次的要求，务必满足】」。
 - 挂件 560×320：`hover` 时 panel opacity 1、chrome 1，移开归 0；A+ 后 `--font:24px`、行数 5 → `#stage` 5 行；锁定后 `data-locked=1`、chrome opacity 0、点锁角标可解锁。
 - 浮层 1600×950：`openLyricsOverlay` 创建 380×230 盒子；点「锁定」→ `iframe.style.pointerEvents='none'`、按钮文案「已锁定」；再点恢复 `auto`。截图 `design/shots/mvp/{widget-settings,widget-locked,overlay-locked,lyric-config}.png`。
+
+## 28. 悬浮歌词改成「壳级挂件」，并把默认背景真正做透明（2026-10-24）
+
+用户三条反馈都成立：只能留在音乐页、黑框不透明、锁定和 × 挤在一起。改法：
+
+- **跨面板/跨工作区**：之前浮层是加在播放器 iframe 里的，面板一卸载就没了。现在 `lib/client.js` 在**壳文档**上挂一个 fixed 的 iframe（`mountLyricsWidget()`）：
+  - 面板「悬浮歌词窗」与浮空岛「歌词」按钮先 `postMessage({type:'ncm-open-lyrics',url})` 给 `window.parent`；壳收到就挂起来并回 `ncm-widget-mounted`；280ms 没回音才退回原来的 PiP / 弹窗。
+  - 挂件可拖动（顶部 24px 抓取条）、可拖右下角改大小，位置/尺寸存 `localStorage('ncm-widget-shell')`。
+  - 关掉音乐面板、切到聊天/文件/设置，歌词还在。
+- **默认透明**：`embed=1` 时背景默认 `none`，`html/body/iframe` 全部透明，只靠文字阴影保证可读；设置里加「背景：透明 / 毛玻璃 / 卡片」三档，透明度滑条只作用于歌词文字（45%–100%）。独立窗口默认仍是卡片（否则桌面上一片字会糊）。
+- **控制条不重叠**：控制条改成单行 flex（上一首 / 播放 / 下一首 / 歌名 / 齿轮 / 锁 / ×，`gap:6px`），不再绝对定位；设置面板默认收起，点齿轮才钉住；锁定后控制条与设置 `visibility:hidden`，只留歌词 + 右上角解锁小锁 + 「已锁定」提示。
+- **锁定的真实效果**：挂件锁定后 iframe `pointer-events:none`，鼠标事件直接落到底下的面板上；壳另外在右上角保留一个解锁按钮（因为它不在被穿透的 iframe 里）。这条是「页面级穿透」，不是操作系统级：真正的桌面置顶/穿透要宿主窗口 API（`setIgnoreMouseEvents` + 置顶），插件拿不到。
+- 验证：本地 harness（`%TEMP%\ncm-shell-harness.html`，花底模拟桌面）+ CDP：透明状态背景完全透出；悬停只出控制条；点锁后 `pointer-events:none`、外壳解锁徽标出现；点徽标恢复。截图 `design/shots/mvp/widget-transparent.png`、`widget-hover-chrome.png`、`widget-locked.png`。
+- 测试 **82/82**（新增挂件协议断言：`ncm-widget-lock/close/unlock`、`data-locked`）。

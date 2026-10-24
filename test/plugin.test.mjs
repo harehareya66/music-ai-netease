@@ -160,6 +160,11 @@ test('the floating lyrics window is served and says what it is', async () => {
     assert.match(page.body, /歌词/);
     // 它只读 API、不写账号：页面里不该出现任何写操作端点。
     assert.doesNotMatch(page.body, /playlist\/create/);
+    // 挂件协议：锁定状态要回报给外壳，关闭要通知外壳。
+    assert.match(page.body, /ncm-widget-lock/);
+    assert.match(page.body, /ncm-widget-close/);
+    assert.match(page.body, /ncm-widget-unlock/);
+    assert.match(page.body, /data-locked/);
   } finally {
     plugin.dispose();
   }
