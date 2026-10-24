@@ -445,3 +445,22 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - 需要重启 DSH 才能让运行中的 GUI 加载 0.2.0（当前进程里还是 0.1.1 的模块实例）。重启后先看 `/music/dev`（检查台）与 `/music/security`。
 - 发布：本地 `git tag v0.2.0`；GitHub 仓库 `harehareya66/music-ai-netease` 用 REST API 同步到 `96deb21`（push 443 仍不通，脚本 `%TEMP%\ncm-upload.mjs`，需 `NODE_OPTIONS=--use-system-ca` 绕卡巴斯基 MITM）。
 - 安装副作用：profile 里 `billion-context` 由 pnpm 顺带从 0.1.201 升到 0.1.204（同一 semver 范围），与本插件无关。
+
+## 28. 二创先配置再生成 + 歌词挂件（2026-10-25）
+
+### 二创：选类型 → 写要求 → 生成
+- `lib/ui/lyric.html`：点模式按钮现在只切换写法（标题/提示/藏头输入框跟着变），**不再自动调模型**；右侧新增「生成要求」文本框（可空）+ 四个快捷词（更口语 / 押韵 / 保留意象 / 更克制），右下按钮文案 `生成`（有结果后变 `重新生成`）。`loadLyrics()` 只渲染占位，不再自动二创。
+- 请求体带 `extra`（≤200 字）；`lib/router.js` 两个 remix 端点读 `body.extra`（≤400 字）；`lib/features.js#remix` 新增 `extra` 参数，`buildRemixPrompt({..., extra, fix})` 把「用户这次的要求」与重试时的「上一版的问题」分成两段，避免重试提示被用户要求覆盖。
+- 单测：`test/remix.test.mjs` 新增 1 例（只给 extra / 只给 fix / 两者同时，断言两段互不串）。
+
+### 歌词挂件（lib/ui/lyric-window.html 重写）
+- 悬停出设置面板：字号 A−/A+（14–40px）、行数 1/3/5、透明度 35–100%、锁定、关闭；点齿轮可固定面板，鼠标移开自动收。
+- 锁定：隐藏控制条与设置、禁用拖动、只留歌词和一个可点的锁角标（点它解锁）；设置存 `localStorage('ncm-widget')`。
+- 拖动：顶部细条与歌词区设 `-webkit-app-region: drag`（Electron/PiP 窗口由系统拖），按钮/面板 `no-drag`。
+- 页内浮层模式（`panel.html#openLyricsOverlay` 重写）：父页面接管拖动（pointer 事件移动 fixed 盒子），顶部「锁定」按钮切到 `iframe.pointer-events:none` —— 这时点击直接落到下面的页面，是浏览器里能实现的「不挡操作」；iframe 内锁定会 postMessage 通知父页面同步。
+- 边界（已实测/已告知用户）：OS 级点击穿透需要主进程 `setIgnoreMouseEvents`，插件拿不到；PiP/独立窗外面的桌面点击无法穿透，只有页内浮层模式可以。
+
+### 验证
+- CDP：二创首屏 `body` 为「先选一种写法，再点生成」，选「翻译」后不生成；写要求后点生成，`meta` 显示发送行数；服务端 prompt 含「【用户这次的要求，务必满足】」。
+- 挂件 560×320：`hover` 时 panel opacity 1、chrome 1，移开归 0；A+ 后 `--font:24px`、行数 5 → `#stage` 5 行；锁定后 `data-locked=1`、chrome opacity 0、点锁角标可解锁。
+- 浮层 1600×950：`openLyricsOverlay` 创建 380×230 盒子；点「锁定」→ `iframe.style.pointerEvents='none'`、按钮文案「已锁定」；再点恢复 `auto`。截图 `design/shots/mvp/{widget-settings,widget-locked,overlay-locked,lyric-config}.png`。

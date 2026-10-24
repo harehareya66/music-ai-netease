@@ -8,11 +8,14 @@
 <style>
   :root {
     --bg: #0b0d10;
+    --card: rgba(17, 19, 24, 0.86);
     --text: #e8eaed;
     --muted: #8b909a;
     --dim: #5c616b;
     --red: #e5484d;
-    --line: rgba(255, 255, 255, 0.08);
+    --line: rgba(255, 255, 255, 0.10);
+    --font: 22px;
+    --alpha: 1;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -23,68 +26,155 @@
     -webkit-user-select: none;
     user-select: none;
     overflow: hidden;
+  }
+  .widget {
+    position: relative;
+    height: 100%;
     display: flex;
     flex-direction: column;
+    background: var(--card);
+    opacity: var(--alpha);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: opacity 160ms ease;
   }
-  .grab { height: 26px; flex: none; -webkit-app-region: drag; cursor: grab; }
+
+  /* 拖动：顶部细条与歌词空白区都可拖（Electron 的 app-region）。 */
+  .grab { height: 22px; flex: none; -webkit-app-region: drag; cursor: grab; }
   .stage {
     flex: 1;
     min-height: 0;
+    -webkit-app-region: drag;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: 0 26px;
+    gap: 10px;
+    padding: 0 24px 6px;
     text-align: center;
   }
   .line { max-width: 100%; line-height: 1.45; transition: color 180ms ease, opacity 180ms ease; }
-  .line.prev, .line.next { font-size: 15px; color: var(--dim); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .line.now { font-size: 24px; font-weight: 600; color: var(--text); }
+  .line.prev, .line.next { font-size: calc(var(--font) * 0.62); color: var(--dim); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .line.now { font-size: var(--font); font-weight: 600; color: var(--text); }
   .line.now.active { color: var(--red); }
-  .line.plain { font-size: 15px; color: var(--muted); }
-  .bar {
+  .line.plain { font-size: calc(var(--font) * 0.64); color: var(--muted); }
+
+  .chrome {
     flex: none;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 14px 12px;
-    border-top: 1px solid var(--line);
+    gap: 8px;
+    padding: 6px 12px 10px;
     color: var(--muted);
     font-size: 11px;
+    opacity: 0;
+    transition: opacity 160ms ease;
+    -webkit-app-region: no-drag;
   }
+  .widget:hover .chrome, .chrome:focus-within { opacity: 1; }
   .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .title b { color: var(--text); font-weight: 500; }
   button {
-    appearance: none;
-    border: 0;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text);
-    width: 30px;
-    height: 30px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+    appearance: none; border: 0; background: rgba(255, 255, 255, 0.06);
+    color: var(--text); width: 28px; height: 28px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    -webkit-app-region: no-drag;
   }
-  button:hover { background: rgba(255, 255, 255, 0.13); }
-  button.play { background: var(--red); color: #fff; width: 34px; height: 34px; }
-  button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  button:hover { background: rgba(255, 255, 255, 0.14); }
+  button.play { background: var(--red); color: #fff; width: 32px; height: 32px; }
+  button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* 靠近 → 弹出设置面板；移开自动收起（点了齿轮则固定）。 */
+  .panel {
+    position: absolute; left: 8px; right: 8px; bottom: 8px;
+    -webkit-app-region: no-drag;
+    background: rgba(12, 14, 18, 0.97);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px 12px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    opacity: 0; pointer-events: none; transform: translateY(6px);
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+  .widget:hover .panel, .panel.pinned { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .panel .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+  .panel .row:first-child { margin-top: 0; }
+  .panel .row .lab { flex: 0 0 44px; color: var(--dim); }
+  .panel .row .val { width: 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  .panel input[type='range'] { flex: 1; min-width: 0; accent-color: var(--red); height: 14px; }
+  .panel .seg { display: flex; gap: 4px; }
+  .panel .seg button { width: 30px; height: 24px; border-radius: 7px; font-size: 11px; color: var(--muted); }
+  .panel .seg button.on { color: var(--text); background: rgba(229, 72, 77, 0.22); }
+  .panel .seg button[data-lines] { width: auto; padding: 0 8px; }
+  .panel .act { margin-left: auto; display: flex; gap: 6px; }
+  .panel .act button { width: auto; padding: 0 10px; height: 24px; font-size: 11px; border-radius: 7px; }
+  .panel .act button.danger { color: #ffb4b6; background: rgba(229, 72, 77, 0.16); }
+  .lock-note { display: none; position: absolute; left: 10px; bottom: 8px; font-size: 10.5px; color: var(--dim); }
+  .lock-badge {
+    position: absolute; right: 10px; top: 10px; width: 22px; height: 22px; border-radius: 50%;
+    display: none; place-items: center; background: rgba(12, 14, 18, 0.82); border: 1px solid var(--line);
+    color: var(--muted); cursor: pointer; -webkit-app-region: no-drag;
+  }
+  .lock-badge:hover { color: var(--text); }
+  .lock-badge svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+  /* 锁定：藏起所有控件、停用拖动；页内浮层模式下父页面会把点击透给下层。 */
+  html[data-locked='1'] .chrome,
+  html[data-locked='1'] .panel { opacity: 0; pointer-events: none; }
+  html[data-locked='1'] .lock-badge { display: grid; }
+  html[data-locked='1'] .grab,
+  html[data-locked='1'] .stage { -webkit-app-region: none; cursor: default; }
+  html[data-locked='1'] .lock-note { display: block; }
   #msg { color: var(--dim); font-size: 12px; }
 </style>
 </head>
 <body>
-  <div class="grab" title="拖动这个窗口"></div>
-  <div class="stage" id="stage">
-    <div class="line plain" id="msg">正在等播放器…</div>
-  </div>
-  <div class="bar">
-    <button id="prev" title="上一首" aria-label="上一首"><svg viewBox="0 0 24 24"><path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/></svg></button>
-    <button id="play" class="play" title="播放/暂停" aria-label="播放或暂停"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
-    <button id="next" title="下一首" aria-label="下一首"><svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></svg></button>
-    <span class="title" id="title"></span>
-    <button id="close" title="关闭歌词窗" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <div class="widget" id="widget">
+    <div class="grab" title="按住拖动窗口"></div>
+    <div class="stage" id="stage">
+      <div class="line plain" id="msg">正在等播放器…</div>
+    </div>
+    <div class="chrome" id="chrome">
+      <button id="prev" title="上一首" aria-label="上一首"><svg viewBox="0 0 24 24"><path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/></svg></button>
+      <button id="play" class="play" title="播放/暂停" aria-label="播放或暂停"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button id="next" title="下一首" aria-label="下一首"><svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></svg></button>
+      <span class="title" id="title"></span>
+      <button id="gear" title="设置" aria-label="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.4 2h-4.8l-.4 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L5.1 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.6h4.8l.4-2.6a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg></button>
+    </div>
+    <div class="lock-badge" id="unlock" title="点击解锁" role="button" aria-label="解锁">
+      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    </div>
+    <div class="lock-note">已锁定 · 只显示歌词（点右上角解锁）</div>
+    <div class="panel" id="panel">
+      <div class="row">
+        <span class="lab">字号</span>
+        <div class="seg">
+          <button type="button" data-font="-2">A−</button>
+          <button type="button" data-font="2">A+</button>
+        </div>
+        <span class="val" id="fontVal">22px</span>
+      </div>
+      <div class="row">
+        <span class="lab">行数</span>
+        <div class="seg" id="lineSeg">
+          <button type="button" data-lines="1">1</button>
+          <button type="button" data-lines="3" class="on">3</button>
+          <button type="button" data-lines="5">5</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lab">透明度</span>
+        <input type="range" id="alpha" min="35" max="100" step="5" value="100" />
+        <span class="val" id="alphaVal">100%</span>
+      </div>
+      <div class="row">
+        <span class="lab">窗口</span>
+        <div class="act">
+          <button type="button" id="lock">锁定</button>
+          <button type="button" id="close" class="danger">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 <script>
 (function () {
@@ -99,6 +189,9 @@
   var lyricId = null;
   var lastTrackId = null;
   var lastFetchAt = 0;
+  var prefs = { font: 22, lines: 3, alpha: 100, locked: false };
+  try { prefs = Object.assign(prefs, JSON.parse(localStorage.getItem('ncm-widget') || '{}')); } catch (e) {}
+
   /* 作词/作曲这类制作人员行不进滚播：它们不是歌词。 */
   function isCapsCredit(text) {
     var t = String(text || '').trim();
@@ -109,6 +202,27 @@
   var stage = document.getElementById('stage');
   var msg = document.getElementById('msg');
   var titleEl = document.getElementById('title');
+  var panel = document.getElementById('panel');
+
+  function savePrefs() {
+    try { localStorage.setItem('ncm-widget', JSON.stringify(prefs)); } catch (e) {}
+  }
+  function applyPrefs() {
+    var root = document.documentElement;
+    root.style.setProperty('--font', prefs.font + 'px');
+    root.style.setProperty('--alpha', String(prefs.alpha / 100));
+    root.dataset.locked = prefs.locked ? '1' : '0';
+    document.getElementById('fontVal').textContent = prefs.font + 'px';
+    document.getElementById('alpha').value = String(prefs.alpha);
+    document.getElementById('alphaVal').textContent = prefs.alpha + '%';
+    document.getElementById('lock').textContent = prefs.locked ? '解锁' : '锁定';
+    Array.prototype.forEach.call(document.querySelectorAll('#lineSeg button'), function (b) {
+      b.classList.toggle('on', Number(b.getAttribute('data-lines')) === prefs.lines);
+    });
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ type: 'ncm-widget-lock', locked: prefs.locked }, '*'); } catch (e) {}
+    }
+  }
 
   function apiGet(path) {
     return fetch(API + path, { cache: 'no-store' }).then(function (res) {
@@ -132,39 +246,35 @@
     return Number(state.reported && state.reported.position || 0);
   }
 
+  function lineEl(cls, text) {
+    var d = document.createElement('div');
+    d.className = 'line ' + cls;
+    d.textContent = text || '';
+    return d;
+  }
+
   function renderLines() {
     stage.textContent = '';
     if (!state || !state.current) {
-      var empty = document.createElement('div');
-      empty.className = 'line plain';
-      empty.textContent = '播放器里没有在放的歌';
-      stage.appendChild(empty);
+      stage.appendChild(lineEl('plain', '播放器里没有在放的歌'));
       titleEl.textContent = '';
       return;
     }
     if (!lines.length) {
-      var none = document.createElement('div');
-      none.className = 'line plain';
-      none.textContent = lyrics ? '这首歌没有时间轴歌词' : '正在取歌词…';
-      stage.appendChild(none);
+      stage.appendChild(lineEl('plain', lyrics ? '这首歌没有时间轴歌词' : '正在取歌词…'));
     } else {
       var pos = positionMs();
       var idx = 0;
       for (var i = 0; i < lines.length; i += 1) {
         if (Number(lines[i].t || 0) <= pos) idx = i;
       }
-      var prev = document.createElement('div');
-      prev.className = 'line prev';
-      prev.textContent = lines[idx - 1] ? lines[idx - 1].text : '';
-      var now = document.createElement('div');
-      now.className = 'line now active';
-      now.textContent = lines[idx] ? lines[idx].text : '';
-      var next = document.createElement('div');
-      next.className = 'line next';
-      next.textContent = lines[idx + 1] ? lines[idx + 1].text : '';
-      stage.appendChild(prev);
-      stage.appendChild(now);
-      stage.appendChild(next);
+      if (prefs.lines >= 3) stage.appendChild(lineEl('prev', lines[idx - 1] ? lines[idx - 1].text : ''));
+      stage.appendChild(lineEl('now active', lines[idx] ? lines[idx].text : ''));
+      if (prefs.lines >= 3) stage.appendChild(lineEl('next', lines[idx + 1] ? lines[idx + 1].text : ''));
+      if (prefs.lines >= 5) {
+        stage.appendChild(lineEl('next', lines[idx + 2] ? lines[idx + 2].text : ''));
+        stage.appendChild(lineEl('next', lines[idx + 3] ? lines[idx + 3].text : ''));
+      }
     }
     var name = state.current.name || '';
     titleEl.innerHTML = '';
@@ -193,7 +303,6 @@
         lyrics = data;
         var raw = (data && data.lyrics && data.lyrics.lines) ? data.lyrics.lines : [];
         lines = raw.filter(function (line) { return line && line.text && !CREDIT_LINE.test(line.text); });
-        /* 开头常有一串纯大写的制作人员人名（没有「作词：」前缀），只掐开头这一段。 */
         var head = 0;
         while (head < lines.length && isCapsCredit(lines[head].text)) head += 1;
         lines = lines.slice(head);
@@ -219,9 +328,7 @@
         renderLines();
         return ensureLyrics();
       })
-      .catch(function () {
-        if (msg) msg.textContent = '连不上播放器';
-      });
+      .catch(function () { if (msg) msg.textContent = '连不上播放器'; });
   }
 
   function bind(id, fn) {
@@ -232,11 +339,47 @@
   bind('next', function () { post('/control', { action: 'next' }); setTimeout(tick, 240); });
   bind('play', function () { post('/control', { action: 'toggle' }); setTimeout(tick, 240); });
   bind('close', function () { window.close(); });
+  bind('lock', function () {
+    prefs.locked = !prefs.locked;
+    if (!prefs.locked) panel.classList.remove('pinned');
+    savePrefs();
+    applyPrefs();
+  });
 
+  /* 点齿轮：固定/收起设置面板（鼠标移开也不收）。 */
+  bind('gear', function () { panel.classList.toggle('pinned'); });
+  var unlockBtn = document.getElementById('unlock');
+  if (unlockBtn) unlockBtn.addEventListener('click', function () {
+    prefs.locked = false;
+    savePrefs();
+    applyPrefs();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-font]'), function (b) {
+    b.addEventListener('click', function () {
+      prefs.font = Math.min(40, Math.max(14, prefs.font + Number(b.getAttribute('data-font'))));
+      savePrefs();
+      applyPrefs();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-lines]'), function (b) {
+    b.addEventListener('click', function () {
+      prefs.lines = Number(b.getAttribute('data-lines'));
+      savePrefs();
+      applyPrefs();
+      renderLines();
+    });
+  });
+  document.getElementById('alpha').addEventListener('input', function () {
+    prefs.alpha = Number(this.value);
+    savePrefs();
+    applyPrefs();
+  });
+
+  applyPrefs();
   tick();
   setInterval(tick, 800);
 
-  /* 父页面（面板/浮空岛）切换主题时把令牌发进来。 */
   window.addEventListener('message', function (event) {
     var data = event.data || {};
     if (data && data.type === 'ncm-theme' && data.tokens) {
