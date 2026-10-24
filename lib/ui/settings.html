@@ -186,6 +186,19 @@
   </div>
 
   <section class="card">
+    <h2>桌面歌词（独立窗口）</h2>
+    <p class="hint">在 Windows 桌面上开一条置顶歌词，不属于 DSH 窗口：可以拖到任何位置、右键调字号或锁定；锁定后点击会穿透到下面的窗口，双击歌词区解锁。DSH 里的悬浮歌词在播放器面板和浮空岛里打开。</p>
+    <div class="row">
+      <span class="label">状态</span>
+      <span class="mono" id="deskState">…</span>
+      <span style="flex:1"></span>
+      <button class="btn" id="deskStart" type="button">打开桌面歌词</button>
+      <button class="btn" id="deskStop" type="button" style="background:transparent;color:var(--muted);border:1px solid var(--line)">关闭</button>
+    </div>
+    <p class="hint" id="deskHint">行数跟随下面「外观」之外单独设置：默认 3 行，右键可改字号、切换锁定。</p>
+  </section>
+
+  <section class="card">
     <h2>数据与安全</h2>
     <p class="hint">账号、cookie、播放历史和模型请求的去向都在「安全与权限」一页；更细的自检在检查台。</p>
     <dl class="kv">
@@ -395,7 +408,37 @@
   $('fontScale').addEventListener('input', function () {
     $('fontScaleText').textContent = Math.round(Number($('fontScale').value) * 100) + '%';
   });
+  function refreshDesk() {
+    return api('/desktop-lyrics').then(function (r) {
+      var el = $('deskState');
+      if (!el) return;
+      el.textContent = r && r.running ? ('运行中 · PID ' + r.pid + ' · ' + r.lines + ' 行') : '未打开';
+      el.style.color = r && r.running ? 'var(--teal)' : 'var(--muted)';
+    }).catch(function () {
+      var el = $('deskState');
+      if (el) el.textContent = '这台宿主机不支持';
+    });
+  }
+
+  function deskAction(action) {
+    var btn = action === 'start' ? $('deskStart') : $('deskStop');
+    btn.disabled = true;
+    api('/desktop-lyrics', { method: 'POST', body: JSON.stringify({ action: action }) })
+      .then(function (r) {
+        toast(action === 'start' ? '桌面歌词已打开' : '桌面歌词已关闭');
+        if (r && r.running === false && action === 'start') toast('没起来：看 dataDir 下的 desktop-lyrics.log');
+        return refreshDesk();
+      })
+      .catch(function (e) {
+        toast('操作失败：' + (e && e.code ? e.code : '未知错误'));
+      })
+      .then(function () { btn.disabled = false; });
+  }
+
   $('saveBtn').addEventListener('click', save);
+  $('deskStart').addEventListener('click', function () { deskAction('start'); });
+  $('deskStop').addEventListener('click', function () { deskAction('stop'); });
+  refreshDesk();
   $('testBtn').addEventListener('click', testRoute);
 
   load();

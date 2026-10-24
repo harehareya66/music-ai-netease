@@ -478,3 +478,32 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - **锁定的真实效果**：挂件锁定后 iframe `pointer-events:none`，鼠标事件直接落到底下的面板上；壳另外在右上角保留一个解锁按钮（因为它不在被穿透的 iframe 里）。这条是「页面级穿透」，不是操作系统级：真正的桌面置顶/穿透要宿主窗口 API（`setIgnoreMouseEvents` + 置顶），插件拿不到。
 - 验证：本地 harness（`%TEMP%\ncm-shell-harness.html`，花底模拟桌面）+ CDP：透明状态背景完全透出；悬停只出控制条；点锁后 `pointer-events:none`、外壳解锁徽标出现；点徽标恢复。截图 `design/shots/mvp/widget-transparent.png`、`widget-hover-chrome.png`、`widget-locked.png`。
 - 测试 **82/82**（新增挂件协议断言：`ncm-widget-lock/close/unlock`、`data-locked`）。
+
+### 28.1 壳级挂件的真实代码验证（不是只画个图）
+- 为了能测 `client.js` 里的 `mountLyricsWidget()`，把 `exports.mountLyricsWidget` 也导出了（壳实际不用，但测试台可以直接调）。
+- `%TEMP%\ncm-client-harness.html`：stub `window.__ModuleLoader__.load` 捕获 factory，用极简 React stub 执行**真实的** `lib/client.js`，再 `mountLyricsWidget().open(absoluteUrl)`；花底模拟其他面板。
+- CDP 结果：挂载成功、拖动后位置变化、子页点锁 → 壳把 iframe 设成 `pointer-events:none` 并显示解锁徽标（`locked=1`）、点徽标恢复、子页点 × → 壳移除节点。截图 `design/shots/mvp/widget-transparent.png`、`widget-hover-chrome.png`、`widget-locked.png` 就是这次跑出来的。
+- 说明：文件协议下 `localStorage` 不可写（位置记忆在 DSH 的 http 源下才生效），测试台忽略这一项；关闭音乐面板后挂件仍在，这一点只能在真实 DSH 里验（重启后）。
+
+## 28. 悬浮歌词：DSH 内挂件 + Windows 桌面窗（2026-10-24）
+
+用户要两样东西：① DSH 内部的悬浮歌词，能跟到任何工作区；② 真正浮在桌面上的歌词窗。
+
+### DSH 内部挂件（`lib/ui/lyric-window.html` + `lib/client.js`）
+- 挂到**壳文档**：`lib/client.js` 的 `mountLyricsWidget()` 在 `document.body` 上挂 fixed 容器 + iframe，面板/浮空岛只发消息请求打开（`ncm-open-lyrics`），所以离开音乐页也还在。
+- 透明：`?embed=1` 时强制 `bg=none`（即使 localStorage 里存过 `card` 也不盖黑底）；锁定态 `html[data-locked='1'] .widget{background:transparent!important}`。
+- 「远离时消失、靠近时显示」：锁定后控制条整体隐藏，解锁徽标默认 `opacity:.16`；`client.js` 在锁定期间监听 `mousemove`，只在光标进入右上角 90×64 区域时把徽标亮到 1。未锁定时控制条只在 hover 时出现。
+- 拖动/缩放：24px 顶部拖动条 + 右下角缩放把手，位置尺寸存 `localStorage('ncm-widget-shell')`。
+- 点击穿透：锁定时 iframe `pointer-events:none`，事件落到底下页面；页内浮层用 `pointer-events:none`。
+- 验证：`%TEMP%\ncm-client-harness.html` 直接执行真实的 `lib/client.js`（stub `__ModuleLoader__` + 极简 React），CDP 实测打开/拖动/锁定/解锁/关闭全通。
+
+### Windows 桌面窗（`lib/desktop-lyrics.ps1` + `lib/desktop-lyrics.js`）
+- 真的独立窗口（WinForms + `TransparencyKey=Black`），`TopMost`，可拖；右键菜单：字号 ±2 / 锁定（点击穿透）/ 打开播放器 / 关闭；双击歌词区切换锁定。
+- 数据链：Node 侧 `startPump()` 每 700ms 读 `/api/state`、换歌时读 `/api/lyric`，算好「标题 + 当前 3/5 行」写进 `desktop-lyrics.content.json`；PowerShell 只读这个文件画字。**不能用 PowerShell 直接请求**：Windows PowerShell 5.1 会把 UTF-8 JSON 当 ANSI，中文全是问号。
+- 启动：`cmd /c start` 拉起 PowerShell（Node detached 直接起会让进程立刻退出），脚本自己把 `$PID` 写进 pid 文件，Node 轮询读回；`.ps1` 必须带 UTF-8 BOM，否则 5.1 按 ANSI 解析中文直接语法错。
+- 接口：`GET /api/desktop-lyrics` 状态、`POST {action:'start'|'stop', lines, fontSize}`；设置页「桌面歌词（独立窗口）」卡片可开可关。
+- 验证：桌面截图（2880×1800，200% 缩放）确认歌词直接浮在 DSH 窗口上、无黑底；`stop` 后进程与窗口都消失。
+
+### 已知限制
+- 桌面窗只支持 Windows（WinForms）；macOS/Linux 需要另写（DSH 内部挂件跨平台）。
+- 锁定时文本像素仍会挡住点击（只有透明区穿透）；若要连文字也穿透，需要整窗 `WS_EX_TRANSPARENT`，但那样就无法双击解锁，故保留文字可点。
