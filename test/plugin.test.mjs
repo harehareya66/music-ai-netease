@@ -152,6 +152,19 @@ test('serves the maker console and its facts', async () => {
   }
 });
 
+test('the floating lyrics window is served and says what it is', async () => {
+  const plugin = mount();
+  try {
+    const page = await plugin.call('/music/lyric-window');
+    assert.equal(page.status, 200);
+    assert.match(page.body, /歌词/);
+    // 它只读 API、不写账号：页面里不该出现任何写操作端点。
+    assert.doesNotMatch(page.body, /playlist\/create/);
+  } finally {
+    plugin.dispose();
+  }
+});
+
 test('settings page and API agree, and a saved route survives a re-read', async () => {
   const plugin = mount();
   try {

@@ -390,3 +390,17 @@ P0 定案里「模型两套配置」是二创报「没有可用的模型」的�
 - 真实账号（uid 562295789）：`GET /api/report?week=this&refresh=1` → `topSource:'account'`、`account{plays:235,tracks:100}`、top1「真夜中のドア〜stay with me」14 次、本机 `metrics{hours:1.2,tracks:28,newTracks:14,skipRate:5.2,plays:55}`、`daily[16,21,25,8,0,0,0]`。
 - 账号-only 数据集（`%TEMP%\ncm-acct`，清空 history）：四卡「—」、循环卡与每日图均为说明文案、榜单来自账号、`text` 为账号口径；上周无账号来源且本机为空 → 整页空态。
 - 截图：`design/shots/mvp/weekly-account.png`、`weekly-account-only.png`。
+
+## 24. P5 悬浮歌词窗（2026-10-24）
+
+用户要「像网易云那样的桌面悬浮歌词窗，可以取消」；P0 定的降级链路：Document PiP → `window.open` 独立小窗 → 页内浮层（三层都不碰播放内核）。
+
+- **新页面** `lib/ui/lyric-window.html`（`/music/lyric-window`，`PAGE_NAMES` 加 `lyric-window`）：上一行 / 当前行（红色）/ 下一行，底部上一首、播放暂停、下一首、歌名艺人、关闭；每秒 800ms 轮询 `/api/state`，按 `reported.position + 距今时长` 推进高亮；歌词只在换歌时拉 `/api/lyric`，并过滤「作词/作曲/原唱…」这类制作人员行（开头无前缀的纯大写人名也掐掉）。
+- **打开方式**：面板「详情/歌词/画像」页签右侧新增「悬浮歌词窗」按钮；浮空岛新增「歌词」按钮（窄屏只留图标）。两者都优先进 `documentPictureInPicture.requestWindow({width:560,height:320})`，把页面 HTML 搬进 PiP 窗口前先注入 `window.__NCM_BASE__`（PiP 的地址是 `about:blank`，页面自己推不出 BASE）；PiP 不可用就 `window.open` 独立窗（带 `?base=`），再被拦就退到面板内 360×210 的浮层 iframe（再点一次关闭）。
+- 关窗不影响播放；窗口里的播放/切歌按钮走 `POST /api/control`，与面板同一份状态。
+- 修过的两个坑：页面读 `data.lines` 应为 `data.lyrics.lines`；PiP 里 `location.pathname` 是 `about:blank` 导致 API 拼成 `/api`，必须注入 BASE。
+
+## 验证
+- `test/plugin.test.mjs` 新增 1 例（`/music/lyric-window` 200、含「歌词」、不含写歌单端点）；全量 **79/79**；`check-panel` 通过（新页面内联脚本语法在检查范围内）。
+- Edge（Chromium 152）CDP 实测：面板点「悬浮歌词窗」与浮空岛点「歌词」都会新增一个 `about:blank` 顶层窗口，页面标题「歌词」，当前行随播放推进（`RYBERG…` 制作人员行已被过滤，播放后当前行变 `And I'll be waiting in the shadow of the sun.`，上一行 `原唱：Max Elto` 之后也过滤）；暂停时粉红色高亮停在当前行。截图 `design/shots/mvp/lyric-window-play.png`、`lyric-window-panel.png`。
+- 待真机：DSH 桌面壳（Electron 44）里 Document PiP 是否允许由壳决定，若不支持会自动落到 `window.open` 小窗；这一条留到 P8 装包后确认。

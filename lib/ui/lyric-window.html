@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>歌词</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --text: #e8eaed;
+    --muted: #8b909a;
+    --dim: #5c616b;
+    --red: #e5484d;
+    --line: rgba(255, 255, 255, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(120% 140% at 50% 0%, #171a20 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .grab { height: 26px; flex: none; -webkit-app-region: drag; cursor: grab; }
+  .stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 0 26px;
+    text-align: center;
+  }
+  .line { max-width: 100%; line-height: 1.45; transition: color 180ms ease, opacity 180ms ease; }
+  .line.prev, .line.next { font-size: 15px; color: var(--dim); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .line.now { font-size: 24px; font-weight: 600; color: var(--text); }
+  .line.now.active { color: var(--red); }
+  .line.plain { font-size: 15px; color: var(--muted); }
+  .bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .title b { color: var(--text); font-weight: 500; }
+  button {
+    appearance: none;
+    border: 0;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  button:hover { background: rgba(255, 255, 255, 0.13); }
+  button.play { background: var(--red); color: #fff; width: 34px; height: 34px; }
+  button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  #msg { color: var(--dim); font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="grab" title="拖动这个窗口"></div>
+  <div class="stage" id="stage">
+    <div class="line plain" id="msg">正在等播放器…</div>
+  </div>
+  <div class="bar">
+    <button id="prev" title="上一首" aria-label="上一首"><svg viewBox="0 0 24 24"><path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/></svg></button>
+    <button id="play" class="play" title="播放/暂停" aria-label="播放或暂停"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+    <button id="next" title="下一首" aria-label="下一首"><svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></svg></button>
+    <span class="title" id="title"></span>
+    <button id="close" title="关闭歌词窗" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+<script>
+(function () {
+  'use strict';
+  var BASE = (window.__NCM_BASE__ || (function () {
+    try { return new URLSearchParams(location.search).get('base') || ''; } catch (e) { return ''; }
+  })() || (location.pathname.split('/lyric-window')[0] || '')).replace(/\/$/, '');
+  var API = BASE + '/api';
+  var state = null;
+  var lyrics = null;
+  var lines = [];
+  var lyricId = null;
+  var lastTrackId = null;
+  var lastFetchAt = 0;
+  /* 作词/作曲这类制作人员行不进滚播：它们不是歌词。 */
+  function isCapsCredit(text) {
+    var t = String(text || '').trim();
+    if (!t || /[a-z一-鿿]/.test(t)) return false;
+    return /^[A-Z][A-Z .,'&\-]{5,}$/.test(t);
+  }
+  var CREDIT_LINE = /^\s*(作词|作曲|编曲|制作人|原唱|演唱|监制|混音|母带|录音|吉他|贝斯|鼓|键盘|弦乐|和声|出品|发行|OP|SP)\s*[:：]/i;
+  var stage = document.getElementById('stage');
+  var msg = document.getElementById('msg');
+  var titleEl = document.getElementById('title');
+
+  function apiGet(path) {
+    return fetch(API + path, { cache: 'no-store' }).then(function (res) {
+      if (!res.ok) throw new Error('http ' + res.status);
+      return res.json();
+    });
+  }
+  function post(path, body) {
+    return fetch(API + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).catch(function () { /* 遥控失败不打扰 */ });
+  }
+
+  function positionMs() {
+    if (!state) return 0;
+    if (state.playing && state.reported && state.reported.at) {
+      return Math.max(0, Number(state.reported.position || 0) + (Date.now() - state.reported.at));
+    }
+    return Number(state.reported && state.reported.position || 0);
+  }
+
+  function renderLines() {
+    stage.textContent = '';
+    if (!state || !state.current) {
+      var empty = document.createElement('div');
+      empty.className = 'line plain';
+      empty.textContent = '播放器里没有在放的歌';
+      stage.appendChild(empty);
+      titleEl.textContent = '';
+      return;
+    }
+    if (!lines.length) {
+      var none = document.createElement('div');
+      none.className = 'line plain';
+      none.textContent = lyrics ? '这首歌没有时间轴歌词' : '正在取歌词…';
+      stage.appendChild(none);
+    } else {
+      var pos = positionMs();
+      var idx = 0;
+      for (var i = 0; i < lines.length; i += 1) {
+        if (Number(lines[i].t || 0) <= pos) idx = i;
+      }
+      var prev = document.createElement('div');
+      prev.className = 'line prev';
+      prev.textContent = lines[idx - 1] ? lines[idx - 1].text : '';
+      var now = document.createElement('div');
+      now.className = 'line now active';
+      now.textContent = lines[idx] ? lines[idx].text : '';
+      var next = document.createElement('div');
+      next.className = 'line next';
+      next.textContent = lines[idx + 1] ? lines[idx + 1].text : '';
+      stage.appendChild(prev);
+      stage.appendChild(now);
+      stage.appendChild(next);
+    }
+    var name = state.current.name || '';
+    titleEl.innerHTML = '';
+    var b = document.createElement('b');
+    b.textContent = name;
+    titleEl.appendChild(b);
+    titleEl.appendChild(document.createTextNode(' — ' + (state.current.artists || []).join(' / ')));
+    var playing = !!state.playing;
+    document.getElementById('playIcon').innerHTML = playing
+      ? '<path d="M7 4h4v16H7z"/><path d="M13 4h4v16h-4z"/>'
+      : '<path d="M8 5v14l11-7z"/>';
+    document.getElementById('play').title = playing ? '暂停' : '播放';
+  }
+
+  function ensureLyrics() {
+    if (!state || !state.current) return Promise.resolve();
+    var id = state.current.id;
+    if (id === lyricId && lyrics && lines.length) return Promise.resolve();
+    if (id === lyricId && Date.now() - lastFetchAt < 5000) return Promise.resolve();
+    lyricId = id;
+    lastFetchAt = Date.now();
+    lyrics = null;
+    lines = [];
+    return apiGet('/lyric?id=' + encodeURIComponent(id) + '&mode=lrc')
+      .then(function (data) {
+        lyrics = data;
+        var raw = (data && data.lyrics && data.lyrics.lines) ? data.lyrics.lines : [];
+        lines = raw.filter(function (line) { return line && line.text && !CREDIT_LINE.test(line.text); });
+        /* 开头常有一串纯大写的制作人员人名（没有「作词：」前缀），只掐开头这一段。 */
+        var head = 0;
+        while (head < lines.length && isCapsCredit(lines[head].text)) head += 1;
+        lines = lines.slice(head);
+        renderLines();
+      })
+      .catch(function () {
+        lyrics = {};
+        lines = [];
+        renderLines();
+      });
+  }
+
+  function tick() {
+    apiGet('/state')
+      .then(function (next) {
+        state = next;
+        if (state.current && state.current.id !== lastTrackId) {
+          lastTrackId = state.current.id;
+          lyricId = null;
+          lyrics = null;
+          lines = [];
+        }
+        renderLines();
+        return ensureLyrics();
+      })
+      .catch(function () {
+        if (msg) msg.textContent = '连不上播放器';
+      });
+  }
+
+  function bind(id, fn) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  }
+  bind('prev', function () { post('/control', { action: 'previous' }); setTimeout(tick, 240); });
+  bind('next', function () { post('/control', { action: 'next' }); setTimeout(tick, 240); });
+  bind('play', function () { post('/control', { action: 'toggle' }); setTimeout(tick, 240); });
+  bind('close', function () { window.close(); });
+
+  tick();
+  setInterval(tick, 800);
+
+  /* 父页面（面板/浮空岛）切换主题时把令牌发进来。 */
+  window.addEventListener('message', function (event) {
+    var data = event.data || {};
+    if (data && data.type === 'ncm-theme' && data.tokens) {
+      Object.keys(data.tokens).forEach(function (name) {
+        document.documentElement.style.setProperty(name, data.tokens[name]);
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
