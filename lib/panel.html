@@ -1835,8 +1835,13 @@
           } catch { /* cross-origin host: fall through below */ }
           setTimeout(() => {
             window.removeEventListener('message', onAck);
-            if (!settled) openLyricsFallback(url);
-          }, 1500);
+            if (!settled) {
+              // Inside DSH the shell owns the floating widget. Opening a PiP or a
+              // popup here would stack a second lyric window on top of it (and
+              // those windows outlive later upgrades), so just say what to do.
+              toast('悬浮歌词需要重启 DSH 后生效（当前壳还没加载新版挂件）');
+            }
+          }, 1200);
           return;
         }
         openLyricsFallback(url);

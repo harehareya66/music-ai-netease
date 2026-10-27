@@ -125,13 +125,22 @@
     /* The window is sized to the lyrics instead of a fixed 900×174 box: a wide
        empty box made the widget look "huge and misaligned" on screen. */
     function fitWindow() {
-      const lines = Array.from(linesEl.children);
+      const lines = Array.from(linesEl.children).filter((el) => el.textContent);
       if (!lines.length) return;
-      let width = 320;
-      for (const el of lines) width = Math.max(width, Math.ceil(el.offsetWidth || 0));
-      width = Math.min(900, Math.max(340, width + 40));
-      const lineHeight = lines.reduce((sum, el) => sum + (el.offsetHeight || 0), 0);
-      const height = Math.min(420, Math.max(92, lineHeight + 42));
+      // Canvas metrics are independent of flex stretching, so the window is
+      // really as wide as the widest lyric line instead of the old 900px slab.
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      let width = 240;
+      let height = 0;
+      for (const el of lines) {
+        const style = getComputedStyle(el);
+        ctx.font = `${style.fontWeight || 400} ${style.fontSize} ${style.fontFamily}`;
+        width = Math.max(width, ctx.measureText(el.textContent).width);
+        height += (parseFloat(style.fontSize) || 24) * 1.42;
+      }
+      width = Math.min(900, Math.max(320, Math.ceil(width) + 44));
+      height = Math.min(420, Math.max(92, Math.ceil(height) + 44));
       if (typeof api.resize === 'function') api.resize(width, height).catch(() => {});
     }
 
